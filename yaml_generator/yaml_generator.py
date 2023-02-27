@@ -215,7 +215,9 @@ def fill_nan_with_table_name(df, col):
     return df
     
 def merge_info_from_KYD_and_Model(df_KYD, df_Models):
-    
+    ''' Do the match between KYD table and Erwin output table'''
+
+    #Replace nan values per NULL 
     df_KYD[['¿PUEDE SER NULO?']] = df_KYD[['¿PUEDE SER NULO?']].replace(np.nan, 'NULL')
        
     #Remove special characters (k2_, #) from TableName
@@ -224,6 +226,8 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #Recognize rofeign tables
     list_foreign_tables = df_KYD[df_KYD['LLAVE FK'] == 'SI']['NOMBRE DE LA TABLA FK'].unique().tolist()
     foreign_tables = df_Models[df_Models['B_TableName'].isin(list_foreign_tables)]
+    
+    #st.write(foreign_tables)
     
     #Fill NAN values with table names 
     df_Models = fill_nan_with_table_name(df_Models, 'B_TableName')
@@ -273,14 +277,19 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     
     df = df[columns_to_keep]
     
+    #Change cell values for key_type_pk and key_type_fk
     df['key_type_pk'] = np.where( (df['key_type_pk'] == 'SI'), 'PK', df['key_type_pk'] )
+    df['key_type_pk'] = np.where( (df['key_type_pk'] == 'SIN DATOS'), 'NO', df['key_type_pk'] )
+    
     df['key_type_fk'] = np.where( (df['key_type_fk'] == 'SI'), 'FK', df['key_type_fk'] )
+    df['key_type_fk'] = np.where( (df['key_type_fk'] == 'SIN DATOS'), 'NO', df['key_type_fk'] )
    
-    #st.dataframe(df)
+    #find primary key fields
     df_pk = df[df['key_type_pk'] == 'PK'].rename(columns={'source':'source_fk',
                                                           'source2':'source2_fk',
                                                           'source3':'source3_fk'})
     
+    #find load_ts fields
     df_loadts = df[df['Name'] == 'LOAD_TS'].rename(columns={'source':'source_fk',
                                                             'source2':'source2_fk',
                                                             'source3':'source3_fk'})
@@ -309,8 +318,8 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
         #df.loc[cut, 'source_fk'] = row.source_fk
         df.loc[cut, 'source2_fk'] = row.source2_fk
         df.loc[cut, 'source3_fk'] = row.source3_fk
-        
-    #st.write('## DF merged')
+    
+    #st.write('## DF merged final')
     #st.dataframe(df)
     
     return df
@@ -510,9 +519,8 @@ if __name__ == '__main__':
                 
                     # Merge KYD with Models
                     df = merge_info_from_KYD_and_Model(df_KYD, df_Models)
-            
+                    
                     write_yaml_file(df) 
-                    #st.dataframe(df_Models)
                     
                 else:
                     st.write('### Terminando programa') 
