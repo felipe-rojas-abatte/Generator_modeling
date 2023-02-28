@@ -367,11 +367,19 @@ def fill_load_ts(df, df2):
                         'NOMBRE FÍSICO TABLA/DATASET/TOPICO':['SIN DATOS'],
                         'NOMBRE FÍSICO CAMPO':['SIN DATOS']})
             df_load_ts = pd.concat([df_load_ts, df2])
-        st.write(r'$\checkmark$:  Se crearon correctamente {} campos LOAD_TS !!!'.format(len(df_load_ts)))    
-        df = pd.concat([df, df_load_ts])
-        df = df.reset_index()
-        del df['index']
-        return df
+        if len(df_load_ts) > 0:
+            st.write(r'Se detectaron {} campos LOAD_TS. ¿Desea agregarlos al archivo .ddl?'.format(len(df_load_ts)))
+            answer = question()
+            
+            if answer.upper() == 'SI':
+                df = pd.concat([df, df_load_ts])
+                st.write(r'$\checkmark$:  Se crearon correctamente {} campos LOAD_TS !!!'.format(len(df_load_ts)))    
+                df = df.reset_index()
+                del df['index']
+                return df
+            if answer.upper() == 'NO':
+                st.write(r'$\checkmark$:  No se agregaron los campos LOAD_TS !!!')
+                return df
     else:
         st.write(r"$\otimes$:  Faltan {} tablas en hoja 'Migration' !!! ".format(len(missing_items)))
         for col in missing_items:
