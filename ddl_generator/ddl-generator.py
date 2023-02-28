@@ -604,7 +604,21 @@ def check_subdominio(df):
         st.write('Archivo Migration solo contiene 1 Sub-dominios') 
         st.dataframe(df_output)
         return sub_dom
+
+def question():
+    ''' Ask to the user to write a decision YES or NO'''
+    allowed_answers = ['SI', 'NO']
+    answer  = None
+    count = 0
+    while answer not in allowed_answers:
+        answer = str(input('Respuesta: ')) 
+        answer = answer.upper()
+        if answer not in allowed_answers: 
+            st.write("Solo acepto SI o NO como respuesta. Intenta nuevamente")
     
+    st.write("tu respuesta fue: {}".format(answer))
+    return answer
+
 def write_ddl_file(df, type_data, list_primary_table_global):
     ''' Generate .ddl file '''
     indent = " "*4
@@ -791,13 +805,11 @@ if __name__ == '__main__':
                     list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique()
                 
                     st.write("¿Desea separar el modelo por sub-dominio? (SI/NO) (escribir en terminal)")
-                    answer_dominio = str(input('Respuesta: '))
-                    st.write("tu respuesta fue: {}".format(answer_dominio))
+                    answer_dominio = question()
                 
                     if answer_dominio.upper() == 'NO':     
                         st.write("¿Desea separar el modelo dependiendo del la sensibilidad de los datos? (SI/NO) (escribir en terminal)")
-                        answer = str(input('Respuesta: '))
-                        st.write("tu respuesta fue: {}".format(answer))
+                        answer = question()
             
                         if answer.upper() == 'NO':     
                             write_ddl_file(df, 'all', list_primary_table_global)
@@ -821,8 +833,7 @@ if __name__ == '__main__':
                     if answer_dominio.upper() == 'SI':
                         df_subdomains = split_on_subdominio(df, df2)  
                         st.write("¿Desea separar el modelo dependiendo del la sensibilidad de los datos? (SI/NO) (escribir en terminal)")
-                        answer = str(input('Respuesta: '))
-                        st.write("tu respuesta fue: {}".format(answer))
+                        answer = question()
                     
                         if answer.upper() == 'NO':
                             for sb in df_subdomains:
