@@ -507,14 +507,22 @@ def sensitive_data_name(data):
     if data.upper() == 'ALL': return 'Sin restricción'
     else: return data.upper()
 
-def create_modified_excel_file(df, type_data):
+def create_modified_excel_file(df, sub_domain, type_data):
     ''' Generate a new excel file considering all the columns with missing values filled ''' 
     
     df = inverse_rename_columns(df)
     type_data_name = sensitive_data_name(type_data)
     
-    df.to_excel('KYD_'+type_data+'.xlsx', sheet_name='KYD', startrow=5, startcol=2, index=False)
-    st.write(r'$\checkmark$:  Archivo KYD_'+type_data+'.xlsx con datos '+type_data_name+' creado satisfactoriamente!')
+    if type_data == 'ALL':
+        excel_output = pd.ExcelWriter('KYD_'+sub_domain+'.xlsx')
+        st.write(r'$\checkmark$:  Archivo KYD_'+sub_domain+'.xlsx con datos '+type_data_name+' creado satisfactoriamente!')
+    else:
+        excel_output = pd.ExcelWriter('KYD_'+sub_domain+'_'+type_data+'.xlsx')
+        st.write(r'$\checkmark$:  Archivo KYD_'+sub_domain+'_'+type_data+'.xlsx con datos '+type_data_name+' creado satisfactoriamente!')
+    
+    with excel_output as writer:
+        df.to_excel(writer, sheet_name='KYD', startrow=5, startcol=2, index=False)
+    
     return
 
 def status_check_of_KYD(df, ind_kyd):
@@ -628,7 +636,7 @@ def question():
     st.write("tu respuesta fue: {}".format(answer))
     return answer
 
-def write_ddl_file(df, type_data, list_primary_table_global):
+def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
     ''' Generate .ddl file '''
     indent = " "*4
     ispk = ['SI']
@@ -641,7 +649,12 @@ def write_ddl_file(df, type_data, list_primary_table_global):
     if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS') 
     list_primary_table_global_modified = [item for item in list_primary_table_global if item not in list_of_primary_tables]
     
-    with open('FILE_'+type_data+'.ddl', "w") as file:
+    if type_data == 'ALL':
+        file_name = 'FILE_'+sub_domain+'.ddl'
+    else:
+        file_name = 'FILE_'+sub_domain+'_'+type_data+'.ddl'   
+        
+    with open(file_name, "w") as file:
             foreign = []
             foreign_table = []
             #filling the main tables from KYD file
@@ -683,13 +696,12 @@ def write_ddl_file(df, type_data, list_primary_table_global):
             #filling the foreign tables from KYD file
             for table, group in df[(df['key_fk'] == 'SI')].groupby('table_fk'):
                 table = table.upper().replace(" ", "_")
-                if table not in list_of_primary_tables:
-                    if table in list_primary_table_global_modified:
+                if table in list_of_foreign_tables:
+                    if table in list_primary_table_global:
                         file.write("CREATE TABLE K2_{} (\n".format(table))
                     else:
                         file.write("CREATE TABLE #{} (\n".format(table))
                 
-                    #list_of_foreign_tables.append(table)
                     last = ""
                     ckeck_PK = []
                     rows = []
@@ -747,8 +759,12 @@ def write_ddl_file(df, type_data, list_primary_table_global):
                     
     type_data_name = sensitive_data_name(type_data)                
     
-    st.write(r'$\checkmark$:  Archivo file_'+type_data+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
-    st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_of_primary_tables), len(list_of_foreign_tables)))                     
+    if type_data == 'ALL':
+        st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
+    else:
+        st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'_'+type_data+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
+
+    st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_of_primary_tables), len(list_of_foreign_tables)))
     return 
 
         
@@ -819,21 +835,22 @@ if __name__ == '__main__':
                     if answer_dominio.upper() == 'NO':     
                         st.write("¿Desea separar el modelo dependiendo del la sensibilidad de los datos? (SI/NO) (escribir en terminal)")
                         answer = question()
+                        sd_name = 'ALL_DOMAINS'
             
                         if answer.upper() == 'NO':     
-                            write_ddl_file(df, 'all', list_primary_table_global)
-                            create_modified_excel_file(df, 'all')
+                            write_ddl_file(df, sd_name, 'ALL', list_primary_table_global)
+                            create_modified_excel_file(df, sd_name, 'ALL')
                         else:     
                             df_hs, df_se, df_ns = split_on_sensitibity(df)
                  
-                            write_ddl_file(df_hs, 'HS', list_primary_table_global)
-                            create_modified_excel_file(df_hs, 'HS')    
+                            write_ddl_file(df_hs, sd_name, 'HS', list_primary_table_global)
+                            create_modified_excel_file(df_hs, sd_name, 'HS')    
                     
-                            write_ddl_file(df_se, 'SE', list_primary_table_global)
-                            create_modified_excel_file(df_se, 'SE')
+                            write_ddl_file(df_se, sd_name, 'SE', list_primary_table_global)
+                            create_modified_excel_file(df_se, sd_name, 'SE')
                     
-                            write_ddl_file(df_ns, 'NS', list_primary_table_global)
-                            create_modified_excel_file(df_ns, 'NS')
+                            write_ddl_file(df_ns, sd_name, 'NS', list_primary_table_global)
+                            create_modified_excel_file(df_ns, sd_name, 'NS')
 
                         #show corporate image
                         image = Image.open('Gobierno_Datos.png')
@@ -848,7 +865,7 @@ if __name__ == '__main__':
                             for sb in df_subdomains:
                                 sd_name = sb[0]
                                 sd_df = sb[1]
-                                write_ddl_file(sd_df, sd_name, list_primary_table_global)
+                                write_ddl_file(sd_df, sd_name, 'ALL', list_primary_table_global)
                                 create_modified_excel_file(sd_df, sd_name)
                         else:
                             for sb in df_subdomains:
@@ -856,14 +873,14 @@ if __name__ == '__main__':
                                 sd_df = sb[1]
                                 df_hs, df_se, df_ns = split_on_sensitibity(sd_df)
                  
-                                write_ddl_file(df_hs, sd_name+'_'+'HS', list_primary_table_global)
-                                create_modified_excel_file(df_hs, sd_name+'_'+'HS')    
+                                write_ddl_file(df_hs, sd_name, 'HS', list_primary_table_global)
+                                create_modified_excel_file(df_hs, sd_name, 'HS')    
                     
-                                write_ddl_file(df_se, sd_name+'_'+'SE', list_primary_table_global)
-                                create_modified_excel_file(df_se, sd_name+'_'+'SE')
+                                write_ddl_file(df_se, sd_name, 'SE', list_primary_table_global)
+                                create_modified_excel_file(df_se, sd_name, 'SE')
                     
-                                write_ddl_file(df_ns, sd_name+'_'+'NS', list_primary_table_global)
-                                create_modified_excel_file(df_ns, sd_name+'_'+'NS')
+                                write_ddl_file(df_ns, sd_name, 'NS', list_primary_table_global)
+                                create_modified_excel_file(df_ns, sd_name, 'NS')
                 else:
                     st.write('### Terminando programa') 
                     #show corporate image
