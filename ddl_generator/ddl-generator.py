@@ -465,19 +465,20 @@ def split_on_sensitibity(df):
     #Select all the tables that contain SE data and remove those who also contain HS data
     for table, group in df[cut_SE].groupby('table'):
         list_SE.append(table)
-    list_SE_filtered = [i for i in list_SE if i not in list_HS]
+    list_SE_filtered = [table for table in list_SE if table not in list_HS]
     df_SE = df[df['table'].isin(list_SE_filtered)]
     #Select tables with NS data from 
-    list_of_tables_with_NS_data = df_SE[df_SE['field_fk']!='SIN DATOS'].table_fk.unique()
-    df_SE_fk = df_NS[(df_NS['table'].isin(list_of_tables_with_NS_data))&(df_NS['key_pk']=='SI')]
-    df_SE_final = pd.concat([df_SE, df_SE_fk])
+    #list_of_tables_with_NS_data = df_SE[df_SE['field_fk']!='SIN DATOS'].table_fk.unique()
+    #df_SE_fk = df_NS[(df_NS['table'].isin(list_of_tables_with_NS_data))&(df_NS['key_pk']=='SI')]
+    #df_SE_final = pd.concat([df_SE, df_SE_fk])
   
     
     df_HS = inverse_rename_columns(df_HS)
+    df_SE = inverse_rename_columns(df_SE)
     df_NS = inverse_rename_columns(df_NS)
-    df_SE_final = inverse_rename_columns(df_SE_final)
+    #df_SE_final = inverse_rename_columns(df_SE_final)
     
-    return df_HS, df_SE_final, df_NS
+    return df_HS, df_SE, df_NS
 
 def split_on_subdominio(df, df2):
     '''Split dataframe depending of the type of sub-dominio each table belong '''
