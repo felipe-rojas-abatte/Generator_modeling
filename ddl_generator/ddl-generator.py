@@ -87,7 +87,16 @@ def check_columns_existence(df, columns, name):
         st.write('Revisar columnas en archivo {} para seguir con el proceso'.format(name))
         st.write(" '{}' columna no encontrada".format(missing_columns[0]))
         return df, False
-
+    
+def check_subdomain_existence(df, col):
+    ''' Check the existance of Sub-Dominio in Migration spreadsheet '''
+    if col in df:
+        st.write('Columna: {} existe en pestaña Migration'.format(col))
+        return True
+    else:
+        st.write('No existe columna {} en pestaña Migration'.format(col))
+        return False
+    
 def show_duplicated_data(df, n_rows):
     """ Verify the existence of duplicated values """
     columns_to_check = ['NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO']
@@ -250,12 +259,11 @@ def show_missing_data(df, n_rows, name):
                    'posición 1ra fila vacía': first_missing
                             })    
     
-    #number of columns with missing data
-    n_col_with_missing_data = len(df_output[df_output['% filas vacías'] > 0.0].columna.tolist())
-    
     #list of columns with missing data
     list_col_with_missing_data = df_output[df_output['% filas vacías'] > 0.0].columna.tolist()
     
+    #number of columns with missing data
+    n_col_with_missing_data = len(list_col_with_missing_data)
     
     if (df_output['% filas vacías'].sum() != 0):
         if list_col_with_missing_data == ['¿PUEDE SER NULO?']:
@@ -310,24 +318,15 @@ def transform_text(df):
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
     
-    list_of_cols_to_consider = ['TABLE NAME',
+    list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TYPE OF LOAD',
-                                'CHARGING PERIODICITY',
-                                'FILTER COLUMN',
-                                'SUB-DOMINIO']
+                                'PERIODICIDAD DE CARGA',
+                                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+                                'COLUMNA DE FILTRADO']
         
-    #Check existance of column name listed above and rename it
-    match = []
-    for col1 in list_of_cols_to_consider:
-        for col2 in df.columns:
-            if col1 in col2:
-                match.append(col1)
-                df = df.rename(columns={col2:col1})
-                
-    df = df[match]
     #Change to upper case, remove empty spaces and change ' ' to _
     for col in df.columns:
-        df[[col]] = df[[col]].apply(lambda x: x.str.upper())
+        df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
         if col in list_of_cols_to_consider:
             df[col] = df[col].apply(replace_space_by_)
@@ -340,8 +339,8 @@ def fill_load_ts(df, df2):
     df_tablas = df.groupby('NOMBRE LÓGICO TABLA').first()
     df_tablas = df_tablas.reset_index()
     
-    missing_items = [col for col in df_tablas['NOMBRE LÓGICO TABLA'] if col not in df2['TABLE NAME'].tolist() ]
-    allowed_items = df2[df2['FILTER COLUMN'] == 'NONE']['TABLE NAME']
+    missing_items = [col for col in df_tablas['NOMBRE LÓGICO TABLA'] if col not in df2['NOMBRE DE LA TABLA'].tolist() ]
+    allowed_items = df2[df2['COLUMNA DE FILTRADO'] == 'NONE']['NOMBRE DE LA TABLA']
     df_tablas = df_tablas[df_tablas['NOMBRE LÓGICO TABLA'].isin(allowed_items)]
     
     if len(missing_items) == 0:
@@ -484,7 +483,7 @@ def split_on_subdominio(df, df2):
     '''Split dataframe depending of the type of sub-dominio each table belong '''
     
     sub_dom = [sub_dom for sub_dom in df2['SUB-DOMINIO'].unique()]
-    list_tables_per_sd = [df2[(df2['SUB-DOMINIO'] == sb)]['TABLE NAME'].tolist() for sb in sub_dom]
+    list_tables_per_sd = [df2[(df2['SUB-DOMINIO'] == sb)]['NOMBRE DE LA TABLA'].tolist() for sb in sub_dom]
     
     df_table_subdomains = []
     df_subdomains = []
@@ -547,6 +546,7 @@ def status_check_of_KYD(df, ind_kyd):
                 'CLASIFICACIÓN DE DATOS',
                 'NOMBRE FÍSICO TABLA/DATASET/TOPICO',
                 'NOMBRE FÍSICO CAMPO']
+    
     #check existence of key columns
     df, check_key_columns = check_columns_existence(df, columnas, 'KYD')
         
@@ -567,20 +567,12 @@ def status_check_of_KYD(df, ind_kyd):
 def status_check_of_Migration(df):
     ''' Function that collect different cross checks on Migration file '''
     
-    columns = ['TABLE NAME',
+    columns = ['NOMBRE DE LA TABLA',
                'TYPE OF LOAD',
-               'CHARGING PERIODICITY',
-               'NUMBER OF DAYS TO EXTRACT IN THE LOAD',
-               'FILTER COLUMN',
-               '¿LO GENERA UN PROVEEDOR?',
-               'SISTEMA O APLICACIÓN',
-               'ID DEL SISTEMA',
-               'SUB-DOMINIO',
-               'DATA RETENTION PERIOD',
-               'ADGROUP',
-               'UNIX ADGROUP',
-               'DATA SET TARGET']
-
+               'PERIODICIDAD DE CARGA',
+               'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+               'COLUMNA DE FILTRADO']
+                          
     #check existence of key columns
     df, check_key_columns = check_columns_existence(df, columns, 'Migration')
     
@@ -593,7 +585,7 @@ def find_tables(file):
     ''' Find the tables on respectives spreadsheets based on the columns names listed below '''
     
     cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['TABLE NAME','TYPE OF LOAD','CHARGING PERIODICITY']
+    cols_mig = ['NOMBRE DE LA TABLA','TYPE OF LOAD','PERIODICIDAD DE CARGA']
     
     check_kyd, ind_kyd = find_skiprows_on_excel(file, 'Diccionario de Datos', cols_kyd)
     check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
@@ -606,21 +598,20 @@ def find_tables(file):
 def check_subdominio(df):
     ''' Check for subdominio existance '''
     
-    sub_dom = [sub_dom for sub_dom in df['SUB-DOMINIO'].unique()]
-    count = len(sub_dom)
-    tab_per_sd = [len(df[df['SUB-DOMINIO']==sd]) for sd in sub_dom]
+    if 'SUB-DOMINIO' in df:
+        sub_dom = [sub_dom for sub_dom in df['SUB-DOMINIO'].unique()]
+        count = len(sub_dom)
+        tab_per_sd = [len(df[df['SUB-DOMINIO']==sd]) for sd in sub_dom]
     
-    df_output = pd.DataFrame({'sub dominio': sub_dom,
-                              'nº tablas por sub dom':tab_per_sd})    
+        df_output = pd.DataFrame({'sub dominio': sub_dom,
+                                  'nº tablas por sub dom':tab_per_sd})    
     
-    if count > 1:
         st.write('Archivo Migration contiene {} Sub-dominios'.format(count))
         st.dataframe(df_output)
         return sub_dom
     else:
-        st.write('Archivo Migration solo contiene 1 Sub-dominios') 
-        st.dataframe(df_output)
-        return sub_dom
+        st.write('No existen Sub-dominios en archivo Migration')
+        return []
 
 def question():
     ''' Ask to the user to write a decision YES or NO'''
@@ -789,32 +780,33 @@ if __name__ == '__main__':
         
             if check_table:
                 #load excel file
-                df, df2 = load_excel(file, ind_kyd, ind_mig)
+                df, df_mig = load_excel(file, ind_kyd, ind_mig)
             
                 # Several cross checks to make sure file KYD is OK
                 df, status_ckeck_KYD = status_check_of_KYD(df, ind_kyd)
             
                 # Several cross checks to make sure file KYD is OK
-                df2, status_ckeck_Migration = status_check_of_Migration(df2)
+                df_mig, status_ckeck_Migration = status_check_of_Migration(df_mig)
 
                 if (status_ckeck_KYD & status_ckeck_Migration):          
                     #checking missing values
                     list_cols_with_md = show_missing_data(df, ind_kyd, 'KYD')
-                    list_cols_with_mig = show_missing_data(df2[['TABLE NAME',
-                                                                'TYPE OF LOAD',
-                                                                'CHARGING PERIODICITY',
-                                                                'SUB-DOMINIO']], ind_mig, 'Migration')
+                    list_cols_with_mig = show_missing_data(df_mig, ind_mig, 'Migration')
         
                     #replace missing values
                     if list_cols_with_md:
                         df = replace_missing_values(df, list_cols_with_md)
                     
+                    #replace missing values
+                    if list_cols_with_mig:
+                        df_mig = replace_missing_values(df_mig, list_cols_with_mig)
+                    
                     #transform text upper case, remove several empty spaces and change ' ' by _
                     df = transform_text(df)
-                    df2 = transform_text_migration(df2)
+                    df_mig = transform_text_migration(df_mig)
             
                     #add rows related to lead_ts field coming from MIGRATION spreadsheet
-                    df = fill_load_ts(df, df2)
+                    df = fill_load_ts(df, df_mig)
  
                     #Change cell values for some columns with a standard one 
                     df = standarize_data_on_columns(df) 
@@ -826,11 +818,14 @@ if __name__ == '__main__':
                     st.write('### Vista final datos en archivo KYD')
                     st.dataframe(df.astype(str)) 
                 
-                    list_subdom = check_subdominio(df2)
+                    list_subdom = check_subdominio(df_mig)
                     list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique()
                 
-                    st.write("¿Desea separar el modelo por sub-dominio? (SI/NO) (escribir en terminal)")
-                    answer_dominio = question()
+                    if len(list_subdom) < 2:
+                        answer_dominio = 'NO'
+                    else:
+                        st.write("¿Desea separar el modelo por sub-dominio? (SI/NO) (escribir en terminal)")
+                        answer_dominio = question()
                 
                     if answer_dominio.upper() == 'NO':     
                         st.write("¿Desea separar el modelo dependiendo del la sensibilidad de los datos? (SI/NO) (escribir en terminal)")
@@ -857,7 +852,7 @@ if __name__ == '__main__':
                         st.image(image, caption='Gobierno de Datos')
                     
                     if answer_dominio.upper() == 'SI':
-                        df_subdomains = split_on_subdominio(df, df2)  
+                        df_subdomains = split_on_subdominio(df, df_mig)  
                         st.write("¿Desea separar el modelo dependiendo del la sensibilidad de los datos? (SI/NO) (escribir en terminal)")
                         answer = question()
                     
@@ -866,7 +861,7 @@ if __name__ == '__main__':
                                 sd_name = sb[0]
                                 sd_df = sb[1]
                                 write_ddl_file(sd_df, sd_name, 'ALL', list_primary_table_global)
-                                create_modified_excel_file(sd_df, sd_name)
+                                create_modified_excel_file(sd_df, sd_name, 'ALL')
                         else:
                             for sb in df_subdomains:
                                 sd_name = sb[0]
