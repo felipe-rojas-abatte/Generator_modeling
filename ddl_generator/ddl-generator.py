@@ -88,15 +88,6 @@ def check_columns_existence(df, columns, name):
         st.write(" '{}' columna no encontrada".format(missing_columns[0]))
         return df, False
     
-def check_subdomain_existence(df, col):
-    ''' Check the existance of Sub-Dominio in Migration spreadsheet '''
-    if col in df:
-        st.write('Columna: {} existe en pestaña Migration'.format(col))
-        return True
-    else:
-        st.write('No existe columna {} en pestaña Migration'.format(col))
-        return False
-    
 def show_duplicated_data(df, n_rows):
     """ Verify the existence of duplicated values """
     columns_to_check = ['NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO']
