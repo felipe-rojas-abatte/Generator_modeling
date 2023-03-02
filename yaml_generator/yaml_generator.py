@@ -224,7 +224,11 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #Recognize rofeign tables
     list_foreign_tables = df_KYD[df_KYD['LLAVE FK'] == 'SI']['NOMBRE DE LA TABLA FK'].unique().tolist()
     foreign_tables = df_Models[df_Models['B_TableName'].isin(list_foreign_tables)]
-    
+    if len(foreign_tables) != 0: 
+        st.write('Se encontraron {} tablas foraneas'.format(len(foreign_tables)))
+    else:
+        st.write('No se encontraron tablas foraneas')
+        
     #Fill NAN values with table names 
     df_Models = fill_nan_with_table_name(df_Models, 'B_TableName')
     
@@ -237,10 +241,10 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     df_KYD['col_merge_A'] = df_KYD['NOMBRE LÓGICO TABLA']
     df_KYD['col_merge_B'] = df_KYD['NOMBRE LÓGICO DEL CAMPO']
     
-    st.write('## Models')
-    st.dataframe(df_Models)
-    st.write('## KYD')
-    st.dataframe(df_KYD)
+    #st.write('## Models')
+    #st.dataframe(df_Models)
+    #st.write('## KYD')
+    #st.dataframe(df_KYD)
     #st.write('## Foreign tables')
     #st.dataframe(foreign_tables)
     
