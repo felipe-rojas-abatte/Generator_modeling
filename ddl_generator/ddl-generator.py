@@ -332,9 +332,7 @@ def fill_load_ts(df, df2):
     
     missing_items = [col for col in df_tablas['NOMBRE LÓGICO TABLA'] if col not in df2['NOMBRE DE LA TABLA'].tolist() ]
     allowed_items = df2[( (df2['COLUMNA DE FILTRADO'] == 'NONE')|
-                          (df2['COLUMNA DE FILTRADO'] == 'SIN DATOS')|
-                          (df2['COLUMNA DE FILTRADO'].isna())|
-                          (df2['COLUMNA DE FILTRADO'].isnull()) )]['NOMBRE DE LA TABLA']
+                          (df2['COLUMNA DE FILTRADO'] == 'SIN DATOS') )]['NOMBRE DE LA TABLA']
     df_tablas = df_tablas[df_tablas['NOMBRE LÓGICO TABLA'].isin(allowed_items)]
     
     if len(missing_items) == 0:
