@@ -381,8 +381,8 @@ def fill_load_ts(df, df2):
 def replace_missing_values(df, list_columns):
     ''' Considere the list of columns to check and provide to the user the oportunity to fill the nan values found '''
     for i,col in enumerate(list_columns):
-        df[[col]] = df[[col]].apply(lambda x: x.str.upper())
         st.write("{}- La columna '{}' contiene '{}' celdas vacías:".format(i+1, col,  df[col].isna().sum() ))
+        df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         #st.dataframe(df[df[[col]].isna()==True][[col]].astype(str))
         st.write("¿Que valor deseas reemplazar en celda vacía? (escribir en terminal)")
         new_word = str(input('Introduzca texto: '))
