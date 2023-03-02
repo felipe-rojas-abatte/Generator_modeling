@@ -406,7 +406,7 @@ def write_yaml_file(df):
                                           source2 = source2, 
                                           source3 = source3)) 
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
+                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
                         file.write(str.format(indent4 = indent4)) 
                     
                 if ((key_type_pk == 'NO')&(key_type_fk == 'FK')):
@@ -434,7 +434,7 @@ def write_yaml_file(df):
                                           source2_fk = source2_fk, 
                                           source3_fk = source3_fk))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
+                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
                         file.write(str.format(indent4 = indent4))
                 
                 if ((key_type_pk == 'NO')&(key_type_fk == 'NO')):
@@ -456,7 +456,7 @@ def write_yaml_file(df):
                                           source2 = source2, 
                                           source3 = source3))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
+                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
                         file.write(str.format(indent4 = indent4))
                         
                 file.write("\n")
