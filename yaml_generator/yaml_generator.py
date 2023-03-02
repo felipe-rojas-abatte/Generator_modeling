@@ -133,19 +133,11 @@ def check_columns_existence_Migration(df):
         df = df.rename(columns={col:remove_empty_spaces(col)})
 
     #columns to be check
-    columnas = ['TABLE NAME',
+    columnas = ['NOMBRE DE LA TABLA',
                 'TYPE OF LOAD',
-                'CHARGING PERIODICITY',
-                'NUMBER OF DAYS TO EXTRACT IN THE LOAD',
-                'FILTER COLUMN',
-                '¿LO GENERA UN PROVEEDOR?',
-                'SISTEMA O APLICACIÓN',
-                'ID DEL SISTEMA',
-                'SUB-DOMINIO',
-                'DATA RETENTION PERIOD',
-                'ADGROUP',
-                'UNIX ADGROUP',
-                'DATA SET TARGET']
+                'PERIODICIDAD DE CARGA',
+                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+                'COLUMNA DE FILTRADO']
         
     #Check existance of column name listed above and rename it
     match = []
@@ -165,6 +157,20 @@ def check_columns_existence_Migration(df):
         st.write("Revisar columnas en archivo 'Migration' para seguir con el proceso")
         st.write(" 'Migration' columna no encontrada".format(missing_columns[0]))
         return df, False   
+
+def find_tables(file):
+    ''' Find the respectives tables spreadsheets based on the columns names listed below '''
+    
+    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
+    cols_mig = ['NOMBRE DE LA TABLA','TYPE OF LOAD','PERIODICIDAD DE CARGA']
+    
+    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
+    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
+    
+    if (check_kyd & check_mig):
+        return True, ind_kyd, ind_mig
+    else:
+        return False, ind_kyd, ind_mig
     
 def rename_columns_from_models(df):
     ''' Rename specific columns '''
@@ -182,23 +188,15 @@ def rename_columns_from_models(df):
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
     
-    list_of_cols_to_consider = ['TABLE NAME',
+    list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TYPE OF LOAD',
-                                'CHARGING PERIODICITY',
-                                'FILTER COLUMN']
+                                'PERIODICIDAD DE CARGA',
+                                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+                                'COLUMNA DE FILTRADO']
         
-    #Check existance of column name listed above and rename it
-    match = []
-    for col1 in list_of_cols_to_consider:
-        for col2 in df.columns:
-            if col1 in col2:
-                match.append(col1)
-                df = df.rename(columns={col2:col1})
-                
-    df = df[match]
     #Change to upper case, remove empty spaces and change ' ' to _
     for col in df.columns:
-        df[[col]] = df[[col]].apply(lambda x: x.str.upper())
+        df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
         if col in list_of_cols_to_consider:
             df[col] = df[col].apply(replace_space_by_)
@@ -462,21 +460,6 @@ def write_yaml_file(df):
                 file.write("\n")
                 
     st.subheader('El archivo YAML ha sido generado con el nombre file.yaml!')
-
-def find_tables(file):
-    ''' Find the respectives tables spreadsheets based on the columns names listed below '''
-    
-    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['TABLE NAME','TYPE OF LOAD','CHARGING PERIODICITY']
-    
-    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
-    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
-    
-    if (check_kyd & check_mig):
-        return True, ind_kyd, ind_mig
-    else:
-        return False, ind_kyd, ind_mig
-    
     
 #Entry point app
 if __name__ == '__main__':
@@ -539,7 +522,6 @@ if __name__ == '__main__':
             image = Image.open('Gobierno_Datos.png')
             st.image(image, caption='Gobierno de Datos') 
     else:
-        st.write('### Terminando programa') 
         #show corporate image
         image = Image.open('Gobierno_Datos.png')
         st.image(image, caption='Gobierno de Datos')                
