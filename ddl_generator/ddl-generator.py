@@ -308,7 +308,6 @@ def transform_text(df):
 
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
-    
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TYPE OF LOAD',
                                 'PERIODICIDAD DE CARGA',
@@ -320,18 +319,19 @@ def transform_text_migration(df):
         df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
         if col in list_of_cols_to_consider:
-            df[col] = df[col].apply(replace_space_by_)
-            
+            df[col] = df[col].apply(replace_space_by_)        
     return df
 
 def fill_load_ts(df, df2):
     ''' Check from Migration spreadsheet the number of tables to add the field __TS'''
-    
+
     df_tablas = df.groupby('NOMBRE LÓGICO TABLA').first()
     df_tablas = df_tablas.reset_index()
-    
+
     missing_items = [col for col in df_tablas['NOMBRE LÓGICO TABLA'] if col not in df2['NOMBRE DE LA TABLA'].tolist() ]
-    allowed_items = df2[df2['COLUMNA DE FILTRADO'] == 'NONE']['NOMBRE DE LA TABLA']
+    #cut_allowed = ( (df2['COLUMNA DE FILTRADO'] == 'NONE') | (df2['COLUMNA DE FILTRADO'] == 'SIN DATOS') )
+    allowed_items = df2['NOMBRE DE LA TABLA']
+    
     df_tablas = df_tablas[df_tablas['NOMBRE LÓGICO TABLA'].isin(allowed_items)]
     
     if len(missing_items) == 0:
@@ -382,7 +382,7 @@ def replace_missing_values(df, list_columns):
     ''' Considere the list of columns to check and provide to the user the oportunity to fill the nan values found '''
     for i,col in enumerate(list_columns):
         st.write("{}- La columna '{}' contiene '{}' celdas vacías:".format(i+1, col,  df[col].isna().sum() ))
-        df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
+        #df[[col]] = df[[col]].apply(lambda x: x.str.upper())
         #st.dataframe(df[df[[col]].isna()==True][[col]].astype(str))
         st.write("¿Que valor deseas reemplazar en celda vacía? (escribir en terminal)")
         new_word = str(input('Introduzca texto: '))
@@ -427,7 +427,8 @@ def standarize_data_on_columns(df):
     #sensitivity of data
     df[['CLASIFICACIÓN DE DATOS']] = df[['CLASIFICACIÓN DE DATOS']].apply(lambda x: x.str.upper())
     df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'NO SENSIBLE'), 'NS', df['CLASIFICACIÓN DE DATOS'])
-    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'SENSIBLE'), 'SE', df['CLASIFICACIÓN DE DATOS'])
+    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'SENSIBLE')|
+                                             (df['CLASIFICACIÓN DE DATOS'] == 'S'), 'SE', df['CLASIFICACIÓN DE DATOS'])
     df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'ALTAMENTE SENSIBLE'), 'HS', df['CLASIFICACIÓN DE DATOS'])
     
     return df
@@ -618,6 +619,12 @@ def question():
     st.write("tu respuesta fue: {}".format(answer))
     return answer
 
+def clean_list(lista):
+    ''' Remove NAN and SIN DATOS values from list'''
+    if 'SIN DATOS' in lista: lista.remove('SIN DATOS') 
+    if 'NAN' in lista: lista.remove('NAN')
+    return lista
+    
 def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
     ''' Generate .ddl file '''
     indent = " "*4
@@ -628,7 +635,7 @@ def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
     
     list_of_primary_tables = df['table'].unique()
     list_of_foreign_tables = [col for col in df['table_fk'].unique() if col not in list_of_primary_tables]
-    if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS') 
+    list_of_foreign_tables = clean_list(list_of_foreign_tables)
     list_primary_table_global_modified = [item for item in list_primary_table_global if item not in list_of_primary_tables]
     
     if type_data == 'ALL':
@@ -747,6 +754,7 @@ def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
         st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'_'+type_data+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
 
     st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_of_primary_tables), len(list_of_foreign_tables)))
+    
     return 
 
         
@@ -798,7 +806,7 @@ if __name__ == '__main__':
             
                     #add rows related to lead_ts field coming from MIGRATION spreadsheet
                     df = fill_load_ts(df, df_mig)
- 
+
                     #Change cell values for some columns with a standard one 
                     df = standarize_data_on_columns(df) 
         
