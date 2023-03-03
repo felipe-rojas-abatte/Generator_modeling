@@ -458,18 +458,16 @@ def split_on_sensitibity(df):
         list_SE.append(table)
     list_SE_filtered = [table for table in list_SE if table not in list_HS]
     df_SE = df[df['table'].isin(list_SE_filtered)]
-    #Select tables with NS data from 
-    #list_of_tables_with_NS_data = df_SE[df_SE['field_fk']!='SIN DATOS'].table_fk.unique()
-    #df_SE_fk = df_NS[(df_NS['table'].isin(list_of_tables_with_NS_data))&(df_NS['key_pk']=='SI')]
-    #df_SE_final = pd.concat([df_SE, df_SE_fk])
-  
     
     df_HS = inverse_rename_columns(df_HS)
     df_SE = inverse_rename_columns(df_SE)
     df_NS = inverse_rename_columns(df_NS)
-    #df_SE_final = inverse_rename_columns(df_SE_final)
     
-    return df_HS, df_SE, df_NS
+    sensitibity_name = ['HS','SE','NS']
+    df_sensitibity   = [df_HS, df_SE, df_NS]
+    zipped_sens = list(zip(sensitibity_name, df_sensitibity))
+    
+    return zipped_sens
 
 def split_on_subdominio(df, df2):
     '''Split dataframe depending of the type of sub-dominio each table belong '''
@@ -625,7 +623,7 @@ def clean_list(lista):
     if 'NAN' in lista: lista.remove('NAN')
     return lista
     
-def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
+def write_ddl_file(df, sub_domain, type_data):
     ''' Generate .ddl file '''
     indent = " "*4
     ispk = ['SI']
@@ -749,8 +747,10 @@ def write_ddl_file(df, sub_domain, type_data, list_primary_table_global):
     type_data_name = sensitive_data_name(type_data)                
     
     if type_data == 'ALL':
+        st.write('--------------------------------------------------------------------------')
         st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
     else:
+        st.write('--------------------------------------------------------------------------')
         st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'_'+type_data+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
 
     st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_of_primary_tables), len(list_of_foreign_tables)))
@@ -818,7 +818,7 @@ if __name__ == '__main__':
                     st.dataframe(df.astype(str)) 
                 
                     list_subdom = check_subdominio(df_mig)
-                    list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique()
+                    list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique() #variable global
                 
                     if len(list_subdom) < 2:
                         answer_dominio = 'NO'
@@ -832,20 +832,20 @@ if __name__ == '__main__':
                         sd_name = 'ALL_DOMAINS'
             
                         if answer.upper() == 'NO':     
-                            write_ddl_file(df, sd_name, 'ALL', list_primary_table_global)
+                            write_ddl_file(df, sd_name, 'ALL')
                             create_modified_excel_file(df, sd_name, 'ALL')
-                        else:     
-                            df_hs, df_se, df_ns = split_on_sensitibity(df)
-                 
-                            write_ddl_file(df_hs, sd_name, 'HS', list_primary_table_global)
-                            create_modified_excel_file(df_hs, sd_name, 'HS')    
-                    
-                            write_ddl_file(df_se, sd_name, 'SE', list_primary_table_global)
-                            create_modified_excel_file(df_se, sd_name, 'SE')
-                    
-                            write_ddl_file(df_ns, sd_name, 'NS', list_primary_table_global)
-                            create_modified_excel_file(df_ns, sd_name, 'NS')
-
+                        else:
+                            df_sensitibity = split_on_sensitibity(df)
+                            for ss in df_sensitibity: # run over all sensitibities
+                                ss_name = ss[0]
+                                ss_df = ss[1]
+                                if len(ss_df) > 0: 
+                                    write_ddl_file(ss_df, sd_name, ss_name)
+                                    create_modified_excel_file(ss_df, sd_name, ss_name)   
+                                else: 
+                                    st.write('--------------------------------------------------------------------------')
+                                    st.write(r'$!$  :  Arvhivo {}_{} no contiene tablas'.format(sd_name, ss_name))
+                            
                         #show corporate image
                         image = Image.open('Gobierno_Datos.png')
                         st.image(image, caption='Gobierno de Datos')
@@ -859,22 +859,24 @@ if __name__ == '__main__':
                             for sb in df_subdomains:
                                 sd_name = sb[0]
                                 sd_df = sb[1]
-                                write_ddl_file(sd_df, sd_name, 'ALL', list_primary_table_global)
+                                write_ddl_file(sd_df, sd_name, 'ALL')
                                 create_modified_excel_file(sd_df, sd_name, 'ALL')
                         else:
-                            for sb in df_subdomains:
+                            for sb in df_subdomains: # run over all subdomains
                                 sd_name = sb[0]
                                 sd_df = sb[1]
-                                df_hs, df_se, df_ns = split_on_sensitibity(sd_df)
-                 
-                                write_ddl_file(df_hs, sd_name, 'HS', list_primary_table_global)
-                                create_modified_excel_file(df_hs, sd_name, 'HS')    
-                    
-                                write_ddl_file(df_se, sd_name, 'SE', list_primary_table_global)
-                                create_modified_excel_file(df_se, sd_name, 'SE')
-                    
-                                write_ddl_file(df_ns, sd_name, 'NS', list_primary_table_global)
-                                create_modified_excel_file(df_ns, sd_name, 'NS')
+                                #df_hs, df_se, df_ns = split_on_sensitibity(sd_df)
+                                df_sensitibity = split_on_sensitibity(sd_df)
+                                for ss in df_sensitibity: # run over all sensitibities
+                                    ss_name = ss[0]
+                                    ss_df = ss[1]
+                                    if len(ss_df) > 0: 
+                                        write_ddl_file(ss_df, sd_name, ss_name)
+                                        create_modified_excel_file(ss_df, sd_name, ss_name)   
+                                    else:
+                                        st.write('--------------------------------------------------------------------------')
+                                        st.write(r'$!$  :  Arvhivos {}_{} no contiene tablas'.format(sd_name, ss_name))
+
                 else:
                     st.write('### Terminando programa') 
                     #show corporate image
