@@ -375,90 +375,83 @@ def write_yaml_file(df):
                 Native_DataType = row.Native_DataType.upper()
                 Description = row.Description
                 pii = row.pii
-                nullable = row.nullable                
-                source = row.source
-                source2 = row.source2
-                source3 = row.source3
-                source_fk = row.source_fk
-                source2_fk = row.source2_fk
-                source3_fk = row.source3_fk
+                nullable = row.nullable
+                source = '.'.join(str(x) for x in [row.source, row.source2, row.source3])
+                source_fk = '.'.join(str(x) for x in [row.source2_fk, row.source3_fk])
                 
                 if ((key_type_pk == 'PK')&(key_type_fk == 'NO')):
-                    str = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          key = key,         
-                                          indent4 = indent4,
-                                          tipo = tipo,       
-                                          key_type_pk = key_type_pk, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2,         
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii,   
-                                          null = null, 
-                                          nullable = nullable,         
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3)) 
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
-                        file.write(str.format(indent4 = indent4)) 
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta "
+                        
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source} "
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             key = key, 
+                                             indent4 = indent4, 
+                                             tipo = tipo, 
+                                             key_type_pk = key_type_pk, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description, 
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source)) 
                     
                 if ((key_type_pk == 'NO')&(key_type_fk == 'FK')):
-                    str = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source2_fk}.{source3_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "         
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          key = key, 
-                                          indent4 = indent4, 
-                                          tipo = tipo, 
-                                          key_type_fk = key_type_fk, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2, 
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii, 
-                                          null = null, 
-                                          nullable = nullable, 
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3, 
-                                          source2_fk = source2_fk, 
-                                          source3_fk = source3_fk))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
-                        file.write(str.format(indent4 = indent4))
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta" 
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}:{source} " 
+                        
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             key = key, 
+                                             indent4 = indent4,
+                                             tipo = tipo, 
+                                             key_type_fk = key_type_fk, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description,  
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source, 
+                                             source_fk = source_fk))
                 
                 if ((key_type_pk == 'NO')&(key_type_fk == 'NO')):
-                    str = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2, 
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii, 
-                                          null = null, 
-                                          nullable = nullable, 
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE() #Fecha de Ingesta"
-                        file.write(str.format(indent4 = indent4))
-                        
+                        string = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta "
+                    
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source} "
+                    
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description, 
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source,
+                                             indent4 = indent4))                         
                 file.write("\n")
                 
     st.subheader('El archivo YAML ha sido generado con el nombre file.yaml!')
