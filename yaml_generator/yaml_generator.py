@@ -133,19 +133,11 @@ def check_columns_existence_Migration(df):
         df = df.rename(columns={col:remove_empty_spaces(col)})
 
     #columns to be check
-    columnas = ['TABLE NAME',
+    columnas = ['NOMBRE DE LA TABLA',
                 'TYPE OF LOAD',
-                'CHARGING PERIODICITY',
-                'NUMBER OF DAYS TO EXTRACT IN THE LOAD',
-                'FILTER COLUMN',
-                '¿LO GENERA UN PROVEEDOR?',
-                'SISTEMA O APLICACIÓN',
-                'ID DEL SISTEMA',
-                'SUB-DOMINIO',
-                'DATA RETENTION PERIOD',
-                'ADGROUP',
-                'UNIX ADGROUP',
-                'DATA SET TARGET']
+                'PERIODICIDAD DE CARGA',
+                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+                'COLUMNA DE FILTRADO']
         
     #Check existance of column name listed above and rename it
     match = []
@@ -165,6 +157,20 @@ def check_columns_existence_Migration(df):
         st.write("Revisar columnas en archivo 'Migration' para seguir con el proceso")
         st.write(" 'Migration' columna no encontrada".format(missing_columns[0]))
         return df, False   
+
+def find_tables(file):
+    ''' Find the respectives tables spreadsheets based on the columns names listed below '''
+    
+    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
+    cols_mig = ['NOMBRE DE LA TABLA','TYPE OF LOAD','PERIODICIDAD DE CARGA']
+    
+    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
+    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
+    
+    if (check_kyd & check_mig):
+        return True, ind_kyd, ind_mig
+    else:
+        return False, ind_kyd, ind_mig
     
 def rename_columns_from_models(df):
     ''' Rename specific columns '''
@@ -182,23 +188,15 @@ def rename_columns_from_models(df):
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
     
-    list_of_cols_to_consider = ['TABLE NAME',
+    list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TYPE OF LOAD',
-                                'CHARGING PERIODICITY',
-                                'FILTER COLUMN']
+                                'PERIODICIDAD DE CARGA',
+                                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+                                'COLUMNA DE FILTRADO']
         
-    #Check existance of column name listed above and rename it
-    match = []
-    for col1 in list_of_cols_to_consider:
-        for col2 in df.columns:
-            if col1 in col2:
-                match.append(col1)
-                df = df.rename(columns={col2:col1})
-                
-    df = df[match]
     #Change to upper case, remove empty spaces and change ' ' to _
     for col in df.columns:
-        df[[col]] = df[[col]].apply(lambda x: x.str.upper())
+        df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
         if col in list_of_cols_to_consider:
             df[col] = df[col].apply(replace_space_by_)
@@ -226,9 +224,11 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #Recognize rofeign tables
     list_foreign_tables = df_KYD[df_KYD['LLAVE FK'] == 'SI']['NOMBRE DE LA TABLA FK'].unique().tolist()
     foreign_tables = df_Models[df_Models['B_TableName'].isin(list_foreign_tables)]
-    
-    #st.write(foreign_tables)
-    
+    if len(foreign_tables) != 0: 
+        st.write('Se encontraron {} tablas foraneas'.format(len(foreign_tables)))
+    else:
+        st.write('No se encontraron tablas foraneas')
+        
     #Fill NAN values with table names 
     df_Models = fill_nan_with_table_name(df_Models, 'B_TableName')
     
@@ -375,108 +375,86 @@ def write_yaml_file(df):
                 Native_DataType = row.Native_DataType.upper()
                 Description = row.Description
                 pii = row.pii
-                nullable = row.nullable                
-                source = row.source
-                source2 = row.source2
-                source3 = row.source3
-                source_fk = row.source_fk
-                source2_fk = row.source2_fk
-                source3_fk = row.source3_fk
+                nullable = row.nullable
+                source = '.'.join(str(x) for x in [row.source, row.source2, row.source3])
+                source_fk = '.'.join(str(x) for x in [row.source2_fk, row.source3_fk])
                 
                 if ((key_type_pk == 'PK')&(key_type_fk == 'NO')):
-                    str = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          key = key,         
-                                          indent4 = indent4,
-                                          tipo = tipo,       
-                                          key_type_pk = key_type_pk, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2,         
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii,   
-                                          null = null, 
-                                          nullable = nullable,         
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3)) 
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
-                        file.write(str.format(indent4 = indent4)) 
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta "
+                        
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_pk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source} "
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             key = key, 
+                                             indent4 = indent4, 
+                                             tipo = tipo, 
+                                             key_type_pk = key_type_pk, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description, 
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source)) 
                     
                 if ((key_type_pk == 'NO')&(key_type_fk == 'FK')):
-                    str = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source2_fk}.{source3_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "         
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          key = key, 
-                                          indent4 = indent4, 
-                                          tipo = tipo, 
-                                          key_type_fk = key_type_fk, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2, 
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii, 
-                                          null = null, 
-                                          nullable = nullable, 
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3, 
-                                          source2_fk = source2_fk, 
-                                          source3_fk = source3_fk))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
-                        file.write(str.format(indent4 = indent4))
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta" 
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}:{source} " 
+                        
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             key = key, 
+                                             indent4 = indent4,
+                                             tipo = tipo, 
+                                             key_type_fk = key_type_fk, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description,  
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source, 
+                                             source_fk = source_fk))
                 
                 if ((key_type_pk == 'NO')&(key_type_fk == 'NO')):
-                    str = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source}.{source2}.{source3} "
-                    file.write(str.format(indent2 = indent2, 
-                                          Name = Name, 
-                                          indents = indents, 
-                                          type = type, 
-                                          Native_DataType = Native_DataType, 
-                                          indents2 = indents2, 
-                                          desc = desc, 
-                                          Description = Description, 
-                                          sensibilidad = sensibilidad, 
-                                          pii = pii, 
-                                          null = null, 
-                                          nullable = nullable, 
-                                          fuente = fuente, 
-                                          source = source, 
-                                          source2 = source2, 
-                                          source3 = source3))
                     if(Name == 'LOAD_TS'):
-                        str = "\n{indent4} static: GETDATE()"
-                        file.write(str.format(indent4 = indent4))
-                        
+                        string = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta "
+                    
+                    else:
+                        string = "{indent2}{Name}: \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source} "
+                    
+                    file.write(string.format(indent2 = indent2, 
+                                             Name = Name, 
+                                             indents = indents, 
+                                             type = type, 
+                                             Native_DataType = Native_DataType, 
+                                             indents2 = indents2, 
+                                             desc = desc, 
+                                             Description = Description, 
+                                             sensibilidad = sensibilidad, 
+                                             pii = pii, 
+                                             null = null, 
+                                             nullable = nullable, 
+                                             fuente = fuente, 
+                                             source = source,
+                                             indent4 = indent4))                         
                 file.write("\n")
                 
     st.subheader('El archivo YAML ha sido generado con el nombre file.yaml!')
-
-def find_tables(file):
-    ''' Find the respectives tables spreadsheets based on the columns names listed below '''
-    
-    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['TABLE NAME','TYPE OF LOAD','CHARGING PERIODICITY']
-    
-    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
-    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
-    
-    if (check_kyd & check_mig):
-        return True, ind_kyd, ind_mig
-    else:
-        return False, ind_kyd, ind_mig
-    
     
 #Entry point app
 if __name__ == '__main__':
@@ -519,7 +497,7 @@ if __name__ == '__main__':
                 
                     # Merge KYD with Models
                     df = merge_info_from_KYD_and_Model(df_KYD, df_Models)
-                    
+
                     write_yaml_file(df) 
                     
                 else:
@@ -539,7 +517,6 @@ if __name__ == '__main__':
             image = Image.open('Gobierno_Datos.png')
             st.image(image, caption='Gobierno de Datos') 
     else:
-        st.write('### Terminando programa') 
         #show corporate image
         image = Image.open('Gobierno_Datos.png')
         st.image(image, caption='Gobierno de Datos')                

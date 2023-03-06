@@ -308,7 +308,6 @@ def transform_text(df):
 
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
-    
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TYPE OF LOAD',
                                 'PERIODICIDAD DE CARGA',
@@ -320,18 +319,19 @@ def transform_text_migration(df):
         df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
         if col in list_of_cols_to_consider:
-            df[col] = df[col].apply(replace_space_by_)
-            
+            df[col] = df[col].apply(replace_space_by_)        
     return df
 
 def fill_load_ts(df, df2):
     ''' Check from Migration spreadsheet the number of tables to add the field __TS'''
-    
+
     df_tablas = df.groupby('NOMBRE LÓGICO TABLA').first()
     df_tablas = df_tablas.reset_index()
-    
+
     missing_items = [col for col in df_tablas['NOMBRE LÓGICO TABLA'] if col not in df2['NOMBRE DE LA TABLA'].tolist() ]
-    allowed_items = df2[df2['COLUMNA DE FILTRADO'] == 'NONE']['NOMBRE DE LA TABLA']
+    #cut_allowed = ( (df2['COLUMNA DE FILTRADO'] == 'NONE') | (df2['COLUMNA DE FILTRADO'] == 'SIN DATOS') )
+    allowed_items = df2['NOMBRE DE LA TABLA']
+    
     df_tablas = df_tablas[df_tablas['NOMBRE LÓGICO TABLA'].isin(allowed_items)]
     
     if len(missing_items) == 0:
@@ -381,8 +381,8 @@ def fill_load_ts(df, df2):
 def replace_missing_values(df, list_columns):
     ''' Considere the list of columns to check and provide to the user the oportunity to fill the nan values found '''
     for i,col in enumerate(list_columns):
-        df[[col]] = df[[col]].apply(lambda x: x.str.upper())
         st.write("{}- La columna '{}' contiene '{}' celdas vacías:".format(i+1, col,  df[col].isna().sum() ))
+        #df[[col]] = df[[col]].apply(lambda x: x.str.upper())
         #st.dataframe(df[df[[col]].isna()==True][[col]].astype(str))
         st.write("¿Que valor deseas reemplazar en celda vacía? (escribir en terminal)")
         new_word = str(input('Introduzca texto: '))
@@ -427,50 +427,10 @@ def standarize_data_on_columns(df):
     #sensitivity of data
     df[['CLASIFICACIÓN DE DATOS']] = df[['CLASIFICACIÓN DE DATOS']].apply(lambda x: x.str.upper())
     df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'NO SENSIBLE'), 'NS', df['CLASIFICACIÓN DE DATOS'])
-    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'SENSIBLE'), 'SE', df['CLASIFICACIÓN DE DATOS'])
+    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'SENSIBLE')|
+                                             (df['CLASIFICACIÓN DE DATOS'] == 'S'), 'SE', df['CLASIFICACIÓN DE DATOS'])
     df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'ALTAMENTE SENSIBLE'), 'HS', df['CLASIFICACIÓN DE DATOS'])
     
-    return df
-
-def add_sensitivity_to_table_name(df, type_data):
-    ''' Add the sensitivity into the table name '''
-    df = df.reset_index()
-    del df['index']
-    
-    list_of_primary_tables = df['table'].unique()
-    list_of_foreign_tables = df['table_fk'].unique().tolist()
-    if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS') 
-    list_of_foreign_tables_not_primary = [col for col in list_of_foreign_tables if col not in list_primary_table_global]
-    
-    list_of_primary_foreign_tables = [col for col in list_of_foreign_tables if col in list_primary_table_global] 
-    list_of_primary_foreign_tables_in_df = [col for col in list_of_primary_foreign_tables if col in list_of_primary_tables]
-    list_of_primary_foreign_tables_not_in_df = [col for col in list_of_primary_foreign_tables if col not in list_of_primary_tables]
-    
-    st.write('foreign tables')
-    st.write(list_of_foreign_tables)
-    st.write('foreign tables not primary')
-    st.write(list_of_foreign_tables_not_primary) #tabla
-    ###################################
-    st.write('primary foreign tables')
-    st.write(list_of_primary_foreign_tables)
-    st.write(df[df['table_fk'].isin(list_of_primary_foreign_tables)])
-    ###################################
-    st.write('primary foreign tables in df')
-    st.write(list_of_primary_foreign_tables_in_df) #tabla_type_data
-    st.write('primary foreign tables not in df') 
-    st.write(list_of_primary_foreign_tables_not_in_df) #tabla_NS
-    
-    df['table_s'] = df['table'].astype(str) +'_'+ str(type_data)
-    df['table_fk_s'] = 'SIN DATOS'
-       
-    for i, row in enumerate(df.iterrows()):
-        if df.at[i, 'table_fk'] in list_of_foreign_tables_not_primary:
-            df.at[i, 'table_fk_s'] = df.at[i, 'table_fk']
-        if df.at[i, 'table_fk'] in list_of_primary_foreign_tables_in_df:
-            df.at[i, 'table_fk_s'] = df.at[i, 'table_fk'] +'_'+ str(type_data)
-        if df.at[i, 'table_fk'] in list_of_primary_foreign_tables_not_in_df:
-            df.at[i, 'table_fk_s'] = df.at[i, 'table_fk'] +'_'+ str('NS')
-        
     return df
 
 def split_on_sensitibity(df):
@@ -500,17 +460,16 @@ def split_on_sensitibity(df):
     list_SE_filtered = [table for table in list_SE if table not in list_HS]
     df_SE = df[df['table'].isin(list_SE_filtered)]
     
-    #Add sensitibity to table name
-    #df_HS = add_sensitivity_to_table_name(df_HS, 'HS')
-    #df_SE = add_sensitivity_to_table_name(df_SE, 'SE')
-    #df_NS = add_sensitivity_to_table_name(df_NS, 'NS')
-    
     #come back to original colum names
     df_HS = inverse_rename_columns(df_HS)
     df_SE = inverse_rename_columns(df_SE)
     df_NS = inverse_rename_columns(df_NS)
     
-    return df_HS, df_SE, df_NS
+    sensitibity_name = ['HS','SE','NS']
+    df_sensitibity   = [df_HS, df_SE, df_NS]
+    zipped_sens = list(zip(sensitibity_name, df_sensitibity))
+    
+    return zipped_sens
 
 def split_on_subdominio(df, df2):
     '''Split dataframe depending of the type of sub-dominio each table belong '''
@@ -634,7 +593,7 @@ def check_subdominio(df):
     if 'SUB-DOMINIO' in df:
         sub_dom = [sub_dom for sub_dom in df['SUB-DOMINIO'].unique()]
         count = len(sub_dom)
-        tab_per_sd = [len(df[df['SUB-DOMINIO']==sd]) for sd in sub_dom]
+        tab_per_sd = [len(df[df['SUB-DOMINIO'] == sd]) for sd in sub_dom]
     
         df_output = pd.DataFrame({'sub dominio': sub_dom,
                                   'nº tablas por sub dom':tab_per_sd})    
@@ -660,50 +619,76 @@ def question():
     st.write("tu respuesta fue: {}".format(answer))
     return answer
 
+def clean_list(lista):
+    ''' Remove NAN and SIN DATOS values from list'''
+    if 'SIN DATOS' in lista: lista.remove('SIN DATOS') 
+    if 'NAN' in lista: lista.remove('NAN')
+    return lista
+
 def distribution_of_tables(df, type_data):
     
     df = df.reset_index()
     del df['index']
     
-    list_of_primary_tables = df['table'].unique()
-    list_of_foreign_tables = df['table_fk'].unique().tolist()
-    if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS')
-    list_primary_table_global_modified = [item for item in list_primary_table_global if item not in list_of_primary_tables]    
-        
-    list_of_not_primary_foreign_tables = [col for col in list_of_foreign_tables if col not in list_primary_table_global]
+    #list of primary tables
+    list_pt = df['table'].unique()
+    list_pt = clean_list(list_pt)
     
-    list_of_primary_foreign_tables = [col for col in list_of_foreign_tables if col in list_primary_table_global] 
-    list_of_primary_foreign_tables_in_df = [col for col in list_of_primary_foreign_tables if col in list_of_primary_tables]
-    list_of_primary_foreign_tables_not_in_df = [col for col in list_of_primary_foreign_tables if col not in list_of_primary_tables]
+    #list of primary tables that not appear on current dataframe
+    #list_primary_table_not_in_df = [item for item in list_primary_table_global if item not in list_pt]    
     
-    #st.write('foreign tables')
-    #st.write(list_of_foreign_tables)
-    #st.write('foreign tables not primary')
-    #st.write(list_of_not_primary_foreign_tables) #tabla
-    ###################################
-    #st.write('primary foreign tables')
-    #st.write(list_of_primary_foreign_tables)
-    foreign = df[df['table_fk'].isin(list_of_primary_foreign_tables)][['table','field','table_fk','field_fk']]
-    #st.write(foreign)
-    ###################################
-    #st.write('primary foreign tables in df')
-    #st.write(list_of_primary_foreign_tables_in_df) # K2_tabla_type_data
-    #st.write('primary foreign tables not in df') 
-    #st.write(list_of_primary_foreign_tables_not_in_df) # #tabla_NS
+    #list of foreign tables in dataframe
+    list_ft = df['table_fk'].unique().tolist()
+    list_ft = clean_list(list_ft)
     
+    #list of foreign tables not belonging to list of primary tables
+    list_ift = [col for col in list_ft if col not in list_primary_table_global]
+    
+    #list of primary/explicit foreign tables
+    list_pft = [col for col in list_ft if col in list_primary_table_global] 
+    #list of primary foreign tables 
+    list_pft_in_df = [col for col in list_pft if col in list_pt]
+    #list of explicit foreign tables
+    list_pft_not_in_df = [col for col in list_pft if col not in list_pt]
+     
     df['table_s'] = df['table'].astype(str) +'_'+ str(type_data)
     df['table_fk_s'] = 'SIN DATOS'
        
     for i, row in enumerate(df.iterrows()):
-        if df.at[i, 'table_fk'] in list_of_not_primary_foreign_tables:
+        if df.at[i, 'table_fk'] in list_ift:
             df.at[i, 'table_fk_s'] = df.at[i, 'table_fk']
-        if df.at[i, 'table_fk'] in list_of_primary_foreign_tables_in_df:
+        if df.at[i, 'table_fk'] in list_pft_in_df:
             df.at[i, 'table_fk_s'] = df.at[i, 'table_fk'] +'_'+ str(type_data)
-        if df.at[i, 'table_fk'] in list_of_primary_foreign_tables_not_in_df:
+        if df.at[i, 'table_fk'] in list_pft_not_in_df:
             df.at[i, 'table_fk_s'] = df.at[i, 'table_fk'] +'_'+ str('NS')
+            
+    columns_to_keep = ['table','table_s','field','table_fk','table_fk_s','field_fk']
+    #DataFrame with foreign tables
+    df_ft = df[df['table_fk'].isin(list_ft)][columns_to_keep]
+    #DataFrame with primary foreign tables 
+    df_pft = df[df['table_fk'].isin(list_pft)][columns_to_keep]
+    #DataFrame with implicit foreign tables
+    df_ift = df[df['table_fk'].isin(list_ift)][columns_to_keep]
     
-    return df, foreign
+    args = [df, #dataframe with sensitibity information
+            df_ft, #dataframe with foreign tables
+            df_pft, #dataframe with primary foreign tables
+            df_ift, #dataframe with implicit foreign tables
+            list_pt, #list primary tables
+            list_ft, #list foreign tables
+            list_pft, #list primary foreigh tables
+            list_pft_in_df, #list primary foreign tables in dataframe 
+            list_pft_not_in_df, #list primary foreign tables not in dataframe 
+            list_ift] #list implicit foreign tables
+    
+    return args
 
+def replace_string(text):
+    text = text.replace("_HS", "")
+    text = text.replace("_SE", "")
+    text = text.replace("_NS", "")
+    return text
+    
 def write_ddl_file(df, sub_domain, type_data):
     ''' Generate .ddl file '''
     indent = " "*4
@@ -711,31 +696,35 @@ def write_ddl_file(df, sub_domain, type_data):
     isfk = ['SI']
    
     df = rename_columns(df)
-    df, foreign_new = distribution_of_tables(df, type_data)
+    df, df_ft, df_pft, df_ift, list_pt, list_ft, list_pft, list_pft_in_df, list_pft_not_in_df, list_ift = distribution_of_tables(df, type_data)
     
-    list_of_primary_tables = df['table'].unique()
-    list_primary_table_global_modified = [item for item in list_primary_table_global if item not in list_of_primary_tables]
-    list_of_foreign_tables = [col for col in df['table_fk'].unique() if col not in list_of_primary_tables]
-    if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS')         
+    #st.dataframe(df)
+    #st.write('list foreign tables')
+    #st.write(list_ft)
+    #st.write('df foreign tables')
+    #st.dataframe(df_ft)
+    #st.write('df foreign tables')
+    #st.dataframe(df_pft)
+    #st.dataframe(df_ift)
+    #st.write('list of primary foreign tables in df')
+    #st.write(list_pft_in_df)
+    #st.write('list of primary foreign tables not in df')
+    #st.write(list_pft_not_in_df)
+    #st.write('list_implicit foreign tables')
+    #st.write(list_ift)
     
     if type_data == 'ALL':
         file_name = 'FILE_'+sub_domain+'.ddl'
-        #list_of_foreign_tables = [col for col in df['table_fk'].unique() if col not in list_of_primary_tables]
-        #if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS')         
-        #main_group = 'table'
-        #fk_group = 'table_fk'
+        main_group = 'table'
+        fk_group = 'table_fk'
     else:
         file_name = 'FILE_'+sub_domain+'_'+type_data+'.ddl'  
-        #list_of_primary_tables_s = df['table_s'].unique()
-        #list_of_foreign_tables = [col for col in df['table_fk_s'].unique() if col not in list_of_primary_tables_s]
-        #if 'SIN DATOS' in list_of_foreign_tables: list_of_foreign_tables.remove('SIN DATOS') 
-        #main_group = 'table_s'
-        #fk_group = 'table_fk_s'
+        main_group = 'table_s'
+        fk_group = 'table_fk_s'
         
     with open(file_name, "w") as file:
-            foreign_table = []
             #filling the main tables from KYD file
-            for table, group in df.groupby('table'):
+            for table, group in df.groupby(main_group):
                 file.write("CREATE TABLE K2_{} (\n".format(table))
                 fields = [] 
                 lenght = len(list(group.itertuples()))
@@ -757,26 +746,25 @@ def write_ddl_file(df, sub_domain, type_data):
                         fields.append(row.field.upper())
             
                 if len(fields) >= 1:
-                    file.write(",\n{indent}PRIMARY KEY ({field})".format(indent = indent,
-                                                                           field = ",".join(fields)))
+                    file.write(",\n{indent}PRIMARY KEY ({field})".format(indent = indent, field = ",".join(fields)))
           
                 file.write("\n);\n\n")
             
             #filling the foreign tables from KYD file
-            for table, group in df[(df['key_fk'] == 'SI')].groupby('table_fk'):
-                table = table.upper().replace(" ", "_")
-                if table in list_of_foreign_tables:
-                    if table in list_primary_table_global:
+            for table, group in df_ft.groupby(fk_group):
+                table_or = replace_string(table)
+                if table_or not in list_pft_in_df: #condicion para evitar escribir la tabla 2 veces
+                    if table_or in list_pft_not_in_df:
                         file.write("CREATE TABLE K2_{} (\n".format(table))
-                    else:
+                    if table_or in list_ift:
                         file.write("CREATE TABLE #{} (\n".format(table))
-                
+               
                     last = ""
                     ckeck_PK = []
                     rows = []
                 
                     # Remove identical rows from group
-                    for row in group.itertuples():
+                    for row in df[df[fk_group] == table].itertuples():
                         rows.append([row.field_fk.upper(), row.type.upper(), row.is_null.upper()])
                     rows_new = []
                     for elem in rows:
@@ -789,53 +777,52 @@ def write_ddl_file(df, sub_domain, type_data):
                         else:
                             last = ""
                         file.write("{indent}{field_fk} {indent}{type} {indent}{is_null}{last_val}".format(indent = indent,
-                                                                                                            field_fk = row[0],
-                                                                                                            type = row[1],
-                                                                                                            is_null = row[2], 
-                                                                                                            last_val = last))
+                                                                                                          field_fk = row[0],
+                                                                                                          type = row[1],
+                                                                                                          is_null = row[2], 
+                                                                                                          last_val = last))
                     
                     
                         ckeck_PK.append(row[0])
                         ckeck_PK = [*set(ckeck_PK)]
                     if len(ckeck_PK) >= 1:
-                        file.write(",\n{indent}PRIMARY KEY ({field_fk})".format(indent = indent, 
-                                                                           field_fk = ",".join(ckeck_PK)))
-                
-                    #Check for foreign key from outside table
-                    for j, row in enumerate(group.itertuples()):
-                        if((row.key_fk.upper() == 'SI')&(row.table_fk.upper().replace(" ","_") not in list_primary_table_global_modified)):
-                            foreign_table.append([row.table, 
-                                                  row.field,
-                                                  row.table_fk,
-                                                  row.field_fk])                        
-                    
+                        file.write(",\n{indent}PRIMARY KEY ({field_fk})".format(indent = indent, field_fk = ",".join(ckeck_PK)))
+                                   
                     file.write("\n);\n\n")
                 
             # foreign key section
-            if len(foreign_new) >= 1:
-                for row in foreign_new.itertuples():
-                    file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES K2_{table_fk} ({field_fk}) \n\n'.format(origin_table = row.table,
-             origin_field = row.field,  
-             table_fk = row.table_fk,
-             field_fk = row.field_fk))
-                    
-            if len(foreign_table) >= 1:
-                for line in foreign_table:
-                    file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES #{table_fk} ({field_fk}) \n\n'.format(origin_table = line[0], 
-             origin_field = line[1],  
-             table_fk = line[2],
-             field_fk = line[3])) 
+            if len(df_pft) >= 1:
+                for row in df_pft.itertuples():
+                    if type_data == 'ALL':
+                        file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES K2_{table_fk} ({field_fk}) \n\n'.format(origin_table = row.table, origin_field = row.field, table_fk = row.table_fk, field_fk = row.field_fk))
+                    else:
+                        file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES K2_{table_fk} ({field_fk}) \n\n'.format(origin_table = row.table_s, origin_field = row.field, table_fk = row.table_fk_s, field_fk = row.field_fk))
+            
+            if len(df_ift) >= 1:
+                for row in df_ift.itertuples():
+                    if type_data == 'ALL':
+                        file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES #{table_fk} ({field_fk}) \n\n'.format(origin_table = row.table, origin_field = row.field, table_fk = row.table_fk, field_fk = row.field_fk)) 
+                    else:
+                        file.write('ALTER TABLE K2_{origin_table} ADD FOREIGN KEY ({origin_field}) REFERENCES #{table_fk} ({field_fk}) \n\n'.format(origin_table = row.table_s, origin_field = row.field, table_fk = row.table_fk_s, field_fk = row.field_fk)) 
                     
     type_data_name = sensitive_data_name(type_data)                
     
     if type_data == 'ALL':
+        st.write('--------------------------------------------------------------------------')
         st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
     else:
+        st.write('--------------------------------------------------------------------------')
         st.write(r'$\checkmark$:  Archivo FILE_'+sub_domain+'_'+type_data+'.ddl con datos '+type_data_name+' creado satisfactoriamente!')
 
-    st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_of_primary_tables), len(list_of_foreign_tables)))
-    return 
+    st.write('Archivo contiene: {} Tablas principales y {} Tablas foraneas'.format(len(list_pt), len(list_ft)-len(list_pft_in_df)))
+    
+    df = inverse_rename_columns(df)
+    
+    return df
 
+def write_output(df, subdomain, sensitibity):
+    df = write_ddl_file(df, subdomain, sensitibity)
+    create_modified_excel_file(df, subdomain, sensitibity)
         
 #Entry point app
 if __name__ == '__main__':
@@ -885,7 +872,7 @@ if __name__ == '__main__':
             
                     #add rows related to lead_ts field coming from MIGRATION spreadsheet
                     df = fill_load_ts(df, df_mig)
- 
+
                     #Change cell values for some columns with a standard one 
                     df = standarize_data_on_columns(df) 
         
@@ -897,7 +884,7 @@ if __name__ == '__main__':
                     st.dataframe(df.astype(str)) 
                 
                     list_subdom = check_subdominio(df_mig)
-                    list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique() #global variable
+                    list_primary_table_global = df['NOMBRE LÓGICO TABLA'].unique() #variable global
                 
                     if len(list_subdom) < 2:
                         answer_dominio = 'NO'
@@ -911,20 +898,18 @@ if __name__ == '__main__':
                         sd_name = 'ALL_DOMAINS'
             
                         if answer.upper() == 'NO':     
-                            write_ddl_file(df, sd_name, 'ALL')
-                            create_modified_excel_file(df, sd_name, 'ALL')
-                        else:     
-                            df_hs, df_se, df_ns = split_on_sensitibity(df)
+                            write_output(df, sd_name, 'ALL')
+                        else:
+                            df_sensitibity = split_on_sensitibity(df)
+                            for ss in df_sensitibity: # run over all sensitibities
+                                ss_name = ss[0]
+                                ss_df = ss[1]
+                                if len(ss_df) > 0:
+                                    write_output(ss_df, sd_name, ss_name)
+                                else: 
+                                    st.write('--------------------------------------------------------------------------')
+                                    st.write(r'$!$  :  Arvhivo {}_{} no contiene tablas'.format(sd_name, ss_name))
                             
-                            write_ddl_file(df_hs, sd_name, 'HS')
-                            create_modified_excel_file(df_hs, sd_name, 'HS')    
-                    
-                            write_ddl_file(df_se, sd_name, 'SE')
-                            create_modified_excel_file(df_se, sd_name, 'SE')
-                    
-                            write_ddl_file(df_ns, sd_name, 'NS')
-                            create_modified_excel_file(df_ns, sd_name, 'NS')
-
                         #show corporate image
                         image = Image.open('Gobierno_Datos.png')
                         st.image(image, caption='Gobierno de Datos')
@@ -938,22 +923,22 @@ if __name__ == '__main__':
                             for sb in df_subdomains:
                                 sd_name = sb[0]
                                 sd_df = sb[1]
-                                write_ddl_file(sd_df, sd_name, 'ALL')
-                                create_modified_excel_file(sd_df, sd_name, 'ALL')
+                                write_output(sd_df, sd_name, 'ALL')
                         else:
-                            for sb in df_subdomains:
+                            for sb in df_subdomains: # run over all subdomains
                                 sd_name = sb[0]
                                 sd_df = sb[1]
-                                df_hs, df_se, df_ns = split_on_sensitibity(sd_df)
-                 
-                                write_ddl_file(df_hs, sd_name, 'HS')
-                                create_modified_excel_file(df_hs, sd_name, 'HS')    
-                    
-                                write_ddl_file(df_se, sd_name, 'SE')
-                                create_modified_excel_file(df_se, sd_name, 'SE')
-                    
-                                write_ddl_file(df_ns, sd_name, 'NS')
-                                create_modified_excel_file(df_ns, sd_name, 'NS')
+
+                                df_sensitibity = split_on_sensitibity(sd_df)
+                                for ss in df_sensitibity: # run over all sensitibities
+                                    ss_name = ss[0]
+                                    ss_df = ss[1]
+                                    if len(ss_df) > 0:
+                                        write_output(ss_df, sd_name, ss_name)   
+                                    else:
+                                        st.write('--------------------------------------------------------------------------')
+                                        st.write(r'$!$  :  Arvhivos {}_{} no contiene tablas'.format(sd_name, ss_name))
+
                 else:
                     st.write('### Terminando programa') 
                     #show corporate image
