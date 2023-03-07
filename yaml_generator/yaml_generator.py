@@ -294,9 +294,13 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
                                                             'source2':'source2_fk',
                                                             'source3':'source3_fk'})
     
+    
     df_foreign = foreign_tables[['Name','B_TableName','B_AttriName']].rename(columns={'B_TableName':'source2_fk',
                                                                                       'B_AttriName':'source3_fk'})
     
+    #create and fill with 'SIN DATOS' source_fk columns to avoid bug in write_yaml_file
+    df['source2_fk'] = 'SIN DATOS'
+    df['source3_fk'] = 'SIN DATOS'
     
     #st.write('## DF merged')
     #st.dataframe(df)
