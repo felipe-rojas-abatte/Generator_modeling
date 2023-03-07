@@ -908,7 +908,7 @@ if __name__ == '__main__':
                                     write_output(ss_df, sd_name, ss_name)
                                 else: 
                                     st.write('--------------------------------------------------------------------------')
-                                    st.write(r'$!$  :  Arvhivo {}_{} no contiene tablas'.format(sd_name, ss_name))
+                                    st.write(r'$!$  :  Archivo {}_{} no contiene tablas'.format(sd_name, ss_name))
                             
                         #show corporate image
                         image = Image.open('Gobierno_Datos.png')
@@ -937,7 +937,7 @@ if __name__ == '__main__':
                                         write_output(ss_df, sd_name, ss_name)   
                                     else:
                                         st.write('--------------------------------------------------------------------------')
-                                        st.write(r'$!$  :  Arvhivos {}_{} no contiene tablas'.format(sd_name, ss_name))
+                                        st.write(r'$!$  :  Archivos {}_{} no contiene tablas'.format(sd_name, ss_name))
 
                 else:
                     st.write('### Terminando programa') 

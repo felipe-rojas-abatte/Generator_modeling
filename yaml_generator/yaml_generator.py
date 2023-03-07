@@ -158,6 +158,28 @@ def check_columns_existence_Migration(df):
         st.write(" 'Migration' columna no encontrada".format(missing_columns[0]))
         return df, False   
 
+def show_fk_tables_without_name(df):
+    ''' Check if a foreign key field has asigned a table name '''
+    cut_fk = (df['key_type_fk'] == 'FK')
+    cut_name_fk = ((df['source2_fk'] == 'SIN DATOS')|(df['source2_fk'].isna()))
+    
+    nameless_tables = df[cut_fk&cut_name_fk][['TableName','Name','B_AttriName']]
+    
+    ## Detect position in KYD
+    position = []
+    for i,row in enumerate(nameless_tables.itertuples()):
+        position.append(nameless_tables.index[i])
+    nameless_tables['posición'] = position
+    
+    if len(nameless_tables) == 0:
+        st.write(r'$\checkmark$:  No existen campos foreign key sin nombres en YAML !!!')
+        return
+    else:
+        st.write(r"$!$  :  Se detectaron campos foreign key sin nombres en YAML !!!")
+        #st.write("Esto genera tablas foráneas sin nombre o con nombre 'SIN DATOS'")
+        st.dataframe(nameless_tables.astype(str))
+        return
+    
 def find_tables(file):
     ''' Find the respectives tables spreadsheets based on the columns names listed below '''
     
@@ -221,7 +243,7 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #Remove special characters (k2_, #) from TableName
     df_Models['B_TableName'] = df_Models['B_TableName'].apply(remove_special_symbols)
  
-    #Recognize rofeign tables
+    #Recognize foreign tables comming from KYD file
     list_foreign_tables = df_KYD[df_KYD['LLAVE FK'] == 'SI']['NOMBRE DE LA TABLA FK'].unique().tolist()
     foreign_tables = df_Models[df_Models['B_TableName'].isin(list_foreign_tables)]
     if len(foreign_tables) != 0: 
@@ -295,10 +317,13 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
                                                             'source3':'source3_fk'})
     
     
-    df_foreign = foreign_tables[['Name','B_TableName','B_AttriName']].rename(columns={'B_TableName':'source2_fk',
-                                                                                      'B_AttriName':'source3_fk'})
+    df_foreign = foreign_tables[['TableName','Name','B_TableName','B_AttriName']]
+    df_foreign['TableName'] = df_foreign['TableName'].apply(remove_gato_symbol)
+    #df_foreign = df_foreign.rename(columns={'B_TableName':'source2_fk','B_AttriName':'source3_fk'})
+    df_foreign = df_foreign.rename(columns={'TableName':'source2_fk','B_AttriName':'source3_fk'})
     
     #create and fill with 'SIN DATOS' source_fk columns to avoid bug in write_yaml_file
+    df['source_fk'] = 'SIN DATOS'
     df['source2_fk'] = 'SIN DATOS'
     df['source3_fk'] = 'SIN DATOS'
     
@@ -311,20 +336,38 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #st.write('## Load TS')
     #st.dataframe(df_loadts)
     
+    #Fill source of primary fields 
     for index, row in df_pk[['Name','source_fk','source2_fk','source3_fk']].iterrows():
         cut = ((df['key_type_fk'] == 'FK')&(df['Name'] == row.Name))
         df.loc[cut, 'source_fk'] = row.source_fk
         df.loc[cut, 'source2_fk'] = row.source2_fk
         df.loc[cut, 'source3_fk'] = row.source3_fk
         
+    #Fill source of foreign fields    
     for index, row in df_foreign[['Name','source2_fk','source3_fk']].iterrows():
         cut = ((df['key_type_fk'] == 'FK')&(df['Name'] == row.Name))
         #df.loc[cut, 'source_fk'] = row.source_fk
         df.loc[cut, 'source2_fk'] = row.source2_fk
         df.loc[cut, 'source3_fk'] = row.source3_fk
     
-    #st.write('## DF merged final')
-    #st.dataframe(df)
+    st.write('### Vista final datos')
+    columns_to_keep = ['TableName',
+                       'B_TableName',
+                       'Name',
+                       'B_AttriName',
+                       'Native_DataType',
+                       'source',
+                       'source2',
+                       'source3',
+                       'key_type_pk',
+                       'key_type_fk',
+                       'nullable',
+                       'pii',
+                       'source2_fk',
+                       'source3_fk',
+                       'Description']
+    df = df[columns_to_keep]
+    st.dataframe(df)
     
     return df
 
@@ -349,6 +392,15 @@ def remove_special_symbols(text):
     text = str(text)
     text = "".join(text.upper().replace("#", ""))
     text = "".join(text.upper().replace("K2_", ""))
+    text = text.replace("_HS", "")
+    text = text.replace("_SE", "")
+    text = text.replace("_NS", "")
+    return text
+                                                              
+def remove_gato_symbol(text):
+    ''' Remove # from string '''
+    text = str(text)
+    text = "".join(text.upper().replace("#", ""))
     return text
 
 def write_yaml_file(df):
@@ -412,7 +464,7 @@ def write_yaml_file(df):
                     if(Name == 'LOAD_TS'):
                         string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: \n{indent4} static: GETDATE() #Fecha de Ingesta" 
                     else:
-                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}:{source} " 
+                        string = "{indent2}{Name}: \n {indents}{key}: \n {indent4}{tipo}: {key_type_fk} \n {indent4}{fuente}: {source_fk} \n {indents}{type}: {Native_DataType}\n {indents2}{desc}: '{Description}'\n {indents}{sensibilidad}: {pii}\n {indents}{null}: {nullable}\n {indents}{fuente}: {source} " 
                         
                     file.write(string.format(indent2 = indent2, 
                                              Name = Name, 
@@ -474,7 +526,6 @@ if __name__ == '__main__':
     if file is not None:
         #Check existance of spreadsheets in excel file
         check_sheets = check_sheets_existance(file)
-        #st.write(check_sheets)
         
         if check_sheets:
             #find excel tables
@@ -498,10 +549,15 @@ if __name__ == '__main__':
                 
                     #transform text upper case, remove several empty spaces and change ' ' by _
                     df_Migration = transform_text_migration(df_Migration)
+                    st.dataframe(df_Migration)
                 
                     # Merge KYD with Models
                     df = merge_info_from_KYD_and_Model(df_KYD, df_Models)
+                    
+                    #check foreign keys without source name
+                    show_fk_tables_without_name(df)
 
+                    #write yaml file
                     write_yaml_file(df) 
                     
                 else:
