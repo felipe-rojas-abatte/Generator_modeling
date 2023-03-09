@@ -408,13 +408,17 @@ def standarize_data_on_columns(df):
     #primary key 
     df[['LLAVE PK']] = df[['LLAVE PK']].apply(lambda x: x.str.upper())
     df['LLAVE PK'] = np.where( (df['LLAVE PK'] == 'PK')|
-                               (df['LLAVE PK'] == 'YES'), 'SI', df['LLAVE PK'] )
+                               (df['LLAVE PK'] == 'YES')|
+                               (df['LLAVE PK'] == 'PRIMARY KEY')|
+                               (df['LLAVE PK'] == 'LLAVE PRIMARIA'), 'SI', df['LLAVE PK'] )
     df['LLAVE PK'] = np.where( (df['LLAVE PK'] == 'NO'), 'NO', df['LLAVE PK'] )
         
     #foreign key
     df[['LLAVE FK']] = df[['LLAVE FK']].apply(lambda x: x.str.upper())
     df['LLAVE FK'] = np.where( (df['LLAVE FK'] == 'FK')|
-                               (df['LLAVE FK'] == 'YES'), 'SI', df['LLAVE FK'] )
+                               (df['LLAVE FK'] == 'YES')|
+                               (df['LLAVE FK'] == 'FOREIGN KEY')|
+                               (df['LLAVE FK'] == 'LLAVE FORANEA'), 'SI', df['LLAVE FK'] )
     df['LLAVE FK'] = np.where( (df['LLAVE FK'] == 'NO'), 'NO', df['LLAVE FK'] )
     
     #is_null
@@ -426,10 +430,13 @@ def standarize_data_on_columns(df):
     
     #sensitivity of data
     df[['CLASIFICACIÓN DE DATOS']] = df[['CLASIFICACIÓN DE DATOS']].apply(lambda x: x.str.upper())
-    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'NO SENSIBLE'), 'NS', df['CLASIFICACIÓN DE DATOS'])
+    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'NO SENSIBLE')|
+                                             (df['CLASIFICACIÓN DE DATOS'] == 'NO SENSITIVE') , 'NS', df['CLASIFICACIÓN DE DATOS'])
     df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'SENSIBLE')|
+                                             (df['CLASIFICACIÓN DE DATOS'] == 'SENSITIVE')|
                                              (df['CLASIFICACIÓN DE DATOS'] == 'S'), 'SE', df['CLASIFICACIÓN DE DATOS'])
-    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'ALTAMENTE SENSIBLE'), 'HS', df['CLASIFICACIÓN DE DATOS'])
+    df['CLASIFICACIÓN DE DATOS'] = np.where( (df['CLASIFICACIÓN DE DATOS'] == 'ALTAMENTE SENSIBLE')|
+                                             (df['CLASIFICACIÓN DE DATOS'] == 'HIGH SENSITIVE'), 'HS', df['CLASIFICACIÓN DE DATOS'])
     
     return df
 
