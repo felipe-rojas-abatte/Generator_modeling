@@ -309,7 +309,7 @@ def transform_text(df):
 def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
-                                'TYPE OF LOAD',
+                                'TIPO DE CARGA',
                                 'PERIODICIDAD DE CARGA',
                                 'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                                 'COLUMNA DE FILTRADO']
@@ -567,7 +567,7 @@ def status_check_of_Migration(df):
     ''' Function that collect different cross checks on Migration file '''
     
     columns = ['NOMBRE DE LA TABLA',
-               'TYPE OF LOAD',
+               'TIPO DE CARGA',
                'PERIODICIDAD DE CARGA',
                'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                'COLUMNA DE FILTRADO']
@@ -584,7 +584,7 @@ def find_tables(file):
     ''' Find the tables on respectives spreadsheets based on the columns names listed below '''
     
     cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['NOMBRE DE LA TABLA','TYPE OF LOAD','PERIODICIDAD DE CARGA']
+    cols_mig = ['NOMBRE DE LA TABLA','TIPO DE CARGA','PERIODICIDAD DE CARGA']
     
     check_kyd, ind_kyd = find_skiprows_on_excel(file, 'Diccionario de Datos', cols_kyd)
     check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)

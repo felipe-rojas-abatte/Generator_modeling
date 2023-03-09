@@ -182,7 +182,7 @@ def check_columns_existence_Migration(df):
 
     #columns to be check
     columnas = ['NOMBRE DE LA TABLA',
-                'TYPE OF LOAD',
+                'TIPO DE CARGA',
                 'PERIODICIDAD DE CARGA',
                 'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                 'COLUMNA DE FILTRADO']
@@ -224,7 +224,7 @@ def show_fk_tables_without_name(df):
         return
     else:
         st.write(r"$!$  :  Se detectaron campos foreign key sin nombre en YAML !!!")
-        #st.write("Esto genera tablas foráneas sin nombre o con nombre 'SIN DATOS'")
+        st.write("Esto genera campos foráneos sin source en archivo file.yaml")
         st.dataframe(nameless_tables.astype(str))
         return
     
@@ -232,7 +232,7 @@ def find_tables(file):
     ''' Find the respectives tables spreadsheets based on the columns names listed below '''
     
     cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['NOMBRE DE LA TABLA','TYPE OF LOAD','PERIODICIDAD DE CARGA']
+    cols_mig = ['NOMBRE DE LA TABLA','TIPO DE CARGA','PERIODICIDAD DE CARGA']
     
     check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
     check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
@@ -260,7 +260,7 @@ def transform_text_migration(df):
     ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
     
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
-                                'TYPE OF LOAD',
+                                'TIPO DE CARGA',
                                 'PERIODICIDAD DE CARGA',
                                 'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                                 'COLUMNA DE FILTRADO']
@@ -470,7 +470,7 @@ def write_readme(df, dict_info, migration):
     #Merge KYD with Migration
     df_final = pd.merge(migration, df_tabla, on=('NOMBRE DE LA TABLA'), how='inner')
     df_final = df_final.rename(columns={'TableName':'Tabla',
-                                        'TYPE OF LOAD (Incremental/Bulk)':'Tipo Carga',
+                                        'TIPO DE CARGA (Incremental/Bulk)':'Tipo Carga',
                                         'PERIODICIDAD DE CARGA':'Periodicidad'})
     
     df_final = df_final[['Tabla','Tipo Carga','Periodicidad']]
