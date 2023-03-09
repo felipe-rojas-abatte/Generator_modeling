@@ -38,7 +38,7 @@ def find_skiprows_on_excel(file, name, cols_table):
         return False, [] 
    
 def find_skiprows_on_excel_for_readme(file, name):
-    ''' Find the integer where the information to build the readme file is '''
+    ''' Find the information header needed to build the readme file '''
     cols_read = ['DOMAIN',
                  'SUB-DOMINIO',
                  'DATA OWNER',
@@ -49,10 +49,7 @@ def find_skiprows_on_excel_for_readme(file, name):
                  'AD GROUP',
                  'UNIX GROUP',
                  'DATA SOURCE / DATABASE',
-                 'CANTIDAD DATA ELEMENT',
-                 '¿LO GENERA UN PROVEEDOR?',
-                 'SISTEMA O APLICACIÓN (APM)',
-                 'ID DEL SISTEMA (APM)']
+                 'CANTIDAD DATA ELEMENT']
   
     #Rename column names
     df = pd.read_excel(file, sheet_name = name , header=0) 
