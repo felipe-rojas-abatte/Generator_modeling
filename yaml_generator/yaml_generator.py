@@ -3,7 +3,7 @@ import pandas as pd  # pip install pandas
 import numpy as np  # pip install numpy
 from PIL import Image
 import keyword
-import difflib
+from tabulate import tabulate
 
 ### Library of functions ###
 def check_sheets_existance(file):
@@ -20,7 +20,7 @@ def check_sheets_existance(file):
         return False
     
 def find_skiprows_on_excel(file, name, cols_table): 
-    ''' Find de integer where the table on excel is found '''
+    ''' Find the integer where the table on excel is found '''
     df = pd.read_excel(file, sheet_name = name , header=0)        
     index_table = []
     for col in df.columns:
@@ -35,6 +35,57 @@ def find_skiprows_on_excel(file, name, cols_table):
         return True, index_table[0]
     else:
         st.write(r'$\otimes$:  Tabla no encontrada en {} !!!'.format(name))
+        return False, [] 
+   
+def find_skiprows_on_excel_for_readme(file, name):
+    ''' Find the integer where the information to build the readme file is '''
+    cols_read = ['DOMAIN',
+                 'SUB-DOMINIO',
+                 'DATA OWNER',
+                 'DATA STEWARD',
+                 'TECHNICAL DATA STEWARD',
+                 'DATA SET TARGET',
+                 'DATA RETENTION PERIOD (Months)',
+                 'AD GROUP',
+                 'UNIX GROUP',
+                 'DATA SOURCE / DATABASE',
+                 'CANTIDAD DATA ELEMENT',
+                 '¿LO GENERA UN PROVEEDOR?',
+                 'SISTEMA O APLICACIÓN (APM)',
+                 'ID DEL SISTEMA (APM)']
+  
+    #Rename column names
+    df = pd.read_excel(file, sheet_name = name , header=0) 
+    for i, col in enumerate(df.columns):
+        df = df.rename(columns={col:i})
+    
+    col_table = []
+    for col in df.columns:
+        for i in range(0, len(df), 1):
+            for val in cols_read:
+                if val == str(df.at[i, col]):
+                    col_table.append(int(col))
+    
+    selected_col = max(set(col_table), key=col_table.count)
+    
+    name = []
+    valor = []
+    for i in range(0, len(df), 1):
+        for val in cols_read:
+            if val == str(df.at[i, selected_col]):
+                name.append(val)
+                valor.append(str(df.at[i, selected_col+1]))
+    
+    encabezado = dict(zip(name, valor))            
+    
+    mising_names = [name for name in encabezado.keys() if encabezado[name] == 'nan']
+    
+    if len(mising_names) == 0:
+        st.write(r'$\checkmark$:  Campos encontrados correctamente !!!')
+        return True, encabezado
+    else:
+        st.write(r'$\otimes$:  Falta información en los siguientes campos !!!')
+        st.dataframe(mising_names)
         return False, [] 
 
 def load_excel(file, ind_kyd, ind_mig):
@@ -172,10 +223,10 @@ def show_fk_tables_without_name(df):
     nameless_tables['posición'] = position
     
     if len(nameless_tables) == 0:
-        st.write(r'$\checkmark$:  No existen campos foreign key sin nombres en YAML !!!')
+        st.write(r'$\checkmark$:  No existen campos foreign key sin nombre en YAML !!!')
         return
     else:
-        st.write(r"$!$  :  Se detectaron campos foreign key sin nombres en YAML !!!")
+        st.write(r"$!$  :  Se detectaron campos foreign key sin nombre en YAML !!!")
         #st.write("Esto genera tablas foráneas sin nombre o con nombre 'SIN DATOS'")
         st.dataframe(nameless_tables.astype(str))
         return
@@ -188,11 +239,12 @@ def find_tables(file):
     
     check_kyd, ind_kyd = find_skiprows_on_excel(file, 'KYD', cols_kyd)
     check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
+    check_rdm, head_readme = find_skiprows_on_excel_for_readme(file, 'Migration')
     
-    if (check_kyd & check_mig):
-        return True, ind_kyd, ind_mig
+    if (check_kyd & check_mig & check_rdm):
+        return True, ind_kyd, ind_mig, head_readme
     else:
-        return False, ind_kyd, ind_mig
+        return False, ind_kyd, ind_mig, head_readme
     
 def rename_columns_from_models(df):
     ''' Rename specific columns '''
@@ -246,10 +298,10 @@ def merge_info_from_KYD_and_Model(df_KYD, df_Models):
     #Recognize foreign tables comming from KYD file
     list_foreign_tables = df_KYD[df_KYD['LLAVE FK'] == 'SI']['NOMBRE DE LA TABLA FK'].unique().tolist()
     foreign_tables = df_Models[df_Models['B_TableName'].isin(list_foreign_tables)]
-    if len(foreign_tables) != 0: 
-        st.write('Se encontraron {} tablas foraneas'.format(len(foreign_tables)))
-    else:
-        st.write('No se encontraron tablas foraneas')
+    #if len(foreign_tables) != 0: 
+    #    st.write('Se encontraron {} tablas foraneas'.format(len(foreign_tables)))
+    #else:
+    #    st.write('No se encontraron tablas foraneas')
         
     #Fill NAN values with table names 
     df_Models = fill_nan_with_table_name(df_Models, 'B_TableName')
@@ -403,6 +455,97 @@ def remove_gato_symbol(text):
     text = "".join(text.upper().replace("#", ""))
     return text
 
+def write_readme(df, dict_info, migration):
+    ''' Create README.MD file '''
+    
+    df_tabla = df.copy()
+    df_load = df.copy()
+    df_mig = migration.copy()
+    
+    #Select only columns that matters and remove duplicated values
+    df_tabla = df_tabla[['TableName','B_TableName']]
+    df_tabla = df_tabla.rename(columns={'B_TableName':'NOMBRE DE LA TABLA'})
+    df_tabla = df_tabla.drop_duplicates()
+    
+    #Select tables with load_ts fields
+    df_load = df_load[df_load['Name'] == 'LOAD_TS']['TableName'].tolist()
+    
+    #Merge KYD with Migration
+    df_final = pd.merge(migration, df_tabla, on=('NOMBRE DE LA TABLA'), how='inner')
+    df_final = df_final.rename(columns={'TableName':'Tabla',
+                                        'TYPE OF LOAD (Incremental/Bulk)':'Tipo Carga',
+                                        'PERIODICIDAD DE CARGA':'Periodicidad'})
+    
+    df_final = df_final[['Tabla','Tipo Carga','Periodicidad']]
+    
+    #Assign incremental value for load_ts tables
+    for tabla in df_final['Tabla'].tolist():
+        cut = (df_final['Tabla'] == tabla)
+        if tabla in df_load:
+            df_final.loc[cut, 'Tipo Carga'] = df_final.loc[cut, 'Tipo Carga'] +str('(last_change_ts)')
+        else:
+            df_final.loc[cut, 'Tipo Carga'] = df_final.loc[cut, 'Tipo Carga'] +str('(last_update_ts)')
+    
+    #Needed information
+    governance_list = ['DOMAIN','SUB-DOMINIO','DATA OWNER','DATA STEWARD','TECHNICAL DATA STEWARD']
+    dataset_target_list = ['DATA SET TARGET']
+    ad_group_list = ['AD GROUP']
+    
+    indent1 = " "
+    indent2 = "  "
+    
+    with open("ReadME.md", "w") as file: 
+        ##############################
+        file.write('## GOVERNANCE \n')
+        for val in governance_list:
+            file.write('{indent2}- {val}: {info_val}'.format(indent2 = indent2,
+                                                             val = val,
+                                                             info_val = dict_info[val]))
+            
+            file.write("\n")
+        file.write("\n\n")
+        ##############################
+        file.write('## DATA SOURCE \n')
+        file.write("\n\n")
+        ##############################
+        file.write('## DATASET TARGET \n')
+        for val in dataset_target_list:
+            file.write('{indent2}- {val}: {info_val}'.format(indent2 = indent2,
+                                                             val = val,
+                                                             info_val = dict_info[val]))
+            
+            file.write("\n")
+        file.write("\n\n")
+        ##############################
+        file.write('## DATA ELEMENT \n')
+        for table, group in df.groupby("TableName"):
+            file.write("{indent2}- {table}{indent2}:{indent1}{number} \n".format(table = table, 
+                                                                                 indent1 = indent1,
+                                                                                 indent2 = indent2,
+                                                                                 number = len(group)))
+        
+        file.write('{indent2}- Total{indent2}:{indent1}{number} \n'.format(indent1 = indent1, indent2 = indent2, number = len(df)))
+        file.write("\n\n")
+        ##############################
+        file.write('## CONTACTO DEL DOMINIO \n')
+        file.write("\n\n")
+        ##############################
+        file.write('## AD GROUP \n')
+        for val in ad_group_list:
+            file.write('{indent2}- {val}: {info_val}'.format(indent2 = indent2,
+                                                             val = val,
+                                                             info_val = dict_info[val]))
+            
+            file.write("\n")
+        file.write("\n\n")
+        ##############################
+        file.write('## DENSIDAD/INYECCION DATOS \n')
+        file.write(tabulate(df_final, headers='keys', tablefmt='psql', showindex=False))
+        file.write("\n\n")
+        
+    st.subheader('El archivo ReadMe.md ha sido generado !!!') 
+    
+
 def write_yaml_file(df):
     # -- Create YAML
     indent2 = "  "
@@ -529,7 +672,7 @@ if __name__ == '__main__':
         
         if check_sheets:
             #find excel tables
-            check_table, ind_kyd, ind_mig = find_tables(file)
+            check_table, ind_kyd, ind_mig, read_info = find_tables(file)
             
             if check_table:
                 #load excel file
@@ -549,16 +692,18 @@ if __name__ == '__main__':
                 
                     #transform text upper case, remove several empty spaces and change ' ' by _
                     df_Migration = transform_text_migration(df_Migration)
-                    st.dataframe(df_Migration)
                 
                     # Merge KYD with Models
                     df = merge_info_from_KYD_and_Model(df_KYD, df_Models)
                     
                     #check foreign keys without source name
                     show_fk_tables_without_name(df)
-
+                    
                     #write yaml file
                     write_yaml_file(df) 
+                    
+                    #write readme file
+                    write_readme(df, read_info, df_Migration)
                     
                 else:
                     st.write('### Terminando programa') 
