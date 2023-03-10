@@ -6,8 +6,10 @@ import keyword
 from tabulate import tabulate
 
 ### Library of functions ###
-def check_sheets_existance(file):
-    ''' Check the existance of needed spreadsheets on excel file'''
+def check_sheets_existence(file):
+    ''' Checks for the existence of necessary sheets in the excel file. 
+        In case one of the 2 sheets is not found the output will be False and the program will ends '''
+    
     check_file = pd.ExcelFile(file)
     list_of_sheets = check_file.sheet_names
     needed_sheets = ['Models','KYD','Migration'] 
@@ -20,7 +22,9 @@ def check_sheets_existance(file):
         return False
     
 def find_skiprows_on_excel(file, name, cols_table): 
-    ''' Find the integer where the table on excel is found '''
+    ''' Find de integer where the table on sheet starts, based on the list of columns as inputs.
+        In case the table is not found the output will be False, otherwise the output will be True and the row number where the table starts will be provided '''
+    
     df = pd.read_excel(file, sheet_name = name , header=0)        
     index_table = []
     for col in df.columns:
@@ -39,6 +43,7 @@ def find_skiprows_on_excel(file, name, cols_table):
    
 def find_skiprows_on_excel_for_readme(file, name):
     ''' Find the information header needed to build the readme file '''
+    
     cols_read = ['DOMAIN',
                  'SUB-DOMINIO',
                  'DATA OWNER',
@@ -86,9 +91,10 @@ def find_skiprows_on_excel_for_readme(file, name):
         return False, [] 
 
 def load_excel(file, ind_kyd, ind_mig):
-    ''' Import excel file and load the data stored in Diccionario de Datos spreadsheet '''
+    ''' Imports excel file and load the data stored in each sheet, based on the integer provided.
+        The output will be 3 dataframes: Models, Diccionario de Datos and Migration '''
     
-    #Read data from sheet: 'Diccionario de Datos and skip first n rows of the excel file
+    #Read data from sheets and skip first n rows of the excel file
     df_Models = pd.read_excel(file, sheet_name='Models', header=0, skiprows=2)
     df_KYD = pd.read_excel(file, sheet_name='KYD' , header=0, skiprows=ind_kyd)
     df_Migration = pd.read_excel(file, sheet_name='Migration' , header=0, skiprows=ind_mig)
@@ -128,7 +134,9 @@ def clean_dataframes(df_Models, df_KYD, df_Migration):
     return df_Models, df_KYD, df_Migration
 
 def check_columns_existence_KYD(df):
-    ''' Verify the existance of specific columns on excel file '''
+    ''' Verifies the existence of specific columns on excel file based on the input list. 
+        In case any of the columns is not found the output will be False and will show which colum is missing,
+        otherwise the output will be True '''
     
     # remove empty spaces in column names
     for col in df.columns:
@@ -154,7 +162,7 @@ def check_columns_existence_KYD(df):
                 'NOMBRE FÍSICO TABLA/DATASET/TOPICO',
                 'NOMBRE FÍSICO CAMPO']
         
-    #Check existance of column name listed above and rename it
+    #Check existence of column name listed above and rename it
     match = []
     for col1 in columnas:
         for col2 in df.columns:
@@ -166,15 +174,17 @@ def check_columns_existence_KYD(df):
   
     if len(match) == len(columnas):
         st.write(r'$\checkmark$:  Validación nombre de columnas en KYD !!!')
-        return df, True
+        return True, df
     else:          
         st.write(r"$\otimes$:  Existen columnas con nombres distintos en archivo 'KYD' !!!")
         st.write("Revisar columnas en archivo 'KYD' para seguir con el proceso")
         st.write(" '{}' columna no encontrada".format(missing_columns[0]))
-        return df, False
+        return False, df
 
 def check_columns_existence_Migration(df):
-    ''' Verify the existance of specific columns on excel file '''
+    ''' Verifies the existence of specific columns on excel file based on the input list. 
+        In case any of the columns is not found the output will be False and will show which colum is missing,
+        otherwise the output will be True '''
     
     # remove empty spaces in column names
     for col in df.columns:
@@ -187,7 +197,7 @@ def check_columns_existence_Migration(df):
                 'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                 'COLUMNA DE FILTRADO']
         
-    #Check existance of column name listed above and rename it
+    #Check existence of column name listed above and rename it
     match = []
     for col1 in columnas:
         for col2 in df.columns:
@@ -199,15 +209,16 @@ def check_columns_existence_Migration(df):
   
     if len(match) == len(columnas):
         st.write(r'$\checkmark$:  Validación nombre de columnas en Migration !!!')
-        return df, True
+        return True, df
     else:          
         st.write(r"$\otimes$:  Existen columnas con nombres distintos en archivo 'Migration' !!!")
         st.write("Revisar columnas en archivo 'Migration' para seguir con el proceso")
         st.write(" 'Migration' columna no encontrada".format(missing_columns[0]))
-        return df, False   
+        return False, df   
 
 def show_fk_tables_without_name(df):
     ''' Check if a foreign key field has asigned a table name '''
+    
     cut_fk = (df['key_type_fk'] == 'FK')
     cut_name_fk = ((df['source2_fk'] == 'SIN DATOS')|(df['source2_fk'].isna()))
     
@@ -229,7 +240,8 @@ def show_fk_tables_without_name(df):
         return
     
 def find_tables(file):
-    ''' Find the respectives tables spreadsheets based on the columns names listed below '''
+    ''' Finds the number of rows where the tables are in respectives sheets based on the columns names listed for each case. 
+        In case one of the 2 tables is not found the output will be False and the program will ends, otherwise the output will be True and the row number where each table starts will be provided '''
     
     cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
     cols_mig = ['NOMBRE DE LA TABLA','TIPO DE CARGA','PERIODICIDAD DE CARGA']
@@ -257,7 +269,10 @@ def rename_columns_from_models(df):
     return df
 
 def transform_text_migration(df):
-    ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
+    ''' Transform all values on the list of columns listed above applying:
+         - lower to upper case
+         - removing first and last empty space
+         - change space in between with _ '''
     
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TIPO DE CARGA',
@@ -544,7 +559,8 @@ def write_readme(df, dict_info, migration):
     
 
 def write_yaml_file(df):
-    # -- Create YAML
+    ''' Generate .yaml file '''
+    
     indent2 = "  "
     indent4 = "     "
     indents = " "*3
@@ -664,8 +680,8 @@ if __name__ == '__main__':
     file = st.file_uploader("Por favor sube el archivo Excel extraído desde Erwin")
 
     if file is not None:
-        #Check existance of spreadsheets in excel file
-        check_sheets = check_sheets_existance(file)
+        #Check existence of spreadsheets in excel file
+        check_sheets = check_sheets_existence(file)
         
         if check_sheets:
             #find excel tables
@@ -679,8 +695,8 @@ if __name__ == '__main__':
                 df_Models, df_KYD, df_Migration = clean_dataframes(df_Models, df_KYD, df_Migration)
                 
                 #check existence of key columns
-                df_KYD, check_KYD = check_columns_existence_KYD(df_KYD)
-                df_Mig, check_Mig = check_columns_existence_Migration(df_Migration)
+                check_KYD, df_KYD = check_columns_existence_KYD(df_KYD)
+                check_Mig, df_Mig = check_columns_existence_Migration(df_Migration)
                 
                 if check_KYD & check_Mig:
         
