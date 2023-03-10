@@ -10,8 +10,10 @@ import streamlit as st
 from PIL import Image
 
 ### Library of functions ###
-def check_sheets_existance(file):
-    ''' Check the existance of needed spreadsheets on excel file'''
+def check_sheets_existence(file):
+    ''' Checks for the existence of necessary sheets in the excel file. 
+        In case one of the 2 sheets is not found the output will be False and the program will ends '''
+    
     check_file = pd.ExcelFile(file)
     list_of_sheets = check_file.sheet_names
     needed_sheets = ['Diccionario de Datos','Migration'] 
@@ -23,8 +25,26 @@ def check_sheets_existance(file):
         st.write("No se encontró la hoja de cálculo '{}'. Verificar archivo KYD !!!".format(not_found_sheets[0]))
         return False
     
+def find_tables(file):
+    ''' Finds the number of rows where the tables are in respectives sheets based on the columns names listed for each case. 
+        In case one of the 2 tables is not found the output will be False and the program will ends, otherwise the output will be True and the row number where each table starts will be provided '''
+    
+    #Columns that will be search in the sheets
+    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
+    cols_mig = ['NOMBRE DE LA TABLA','TIPO DE CARGA','PERIODICIDAD DE CARGA']
+    
+    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'Diccionario de Datos', cols_kyd)
+    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
+    
+    if (check_kyd & check_mig):
+        return True, ind_kyd, ind_mig
+    else:
+        return False, ind_kyd, ind_mig
+    
 def find_skiprows_on_excel(file, name, cols_table): 
-    ''' Find de integer where the table on excel is found '''
+    ''' Find de integer where the table on sheet starts, based on the list of columns as inputs.
+        In case the table is not found the output will be False, otherwise the output will be True and the row number where the table starts will be provided '''
+    
     df = pd.read_excel(file, sheet_name = name , header=0)        
     index_table = []
     for col in df.columns:
@@ -33,6 +53,7 @@ def find_skiprows_on_excel(file, name, cols_table):
                 if val in str(df.at[i, col]):
                     index_table.append(i+1)
     result = all(element == index_table[0] for element in index_table)
+    
     if (result):
         st.write(r'$\checkmark$:  Tabla encontrada en {} !!!'.format(name))
         return True, index_table[0]
@@ -41,13 +62,15 @@ def find_skiprows_on_excel(file, name, cols_table):
         return False, [] 
     
 def load_excel(file, ind_kyd, ind_mig):
-    ''' Import excel file and load the data stored in Diccionario de Datos spreadsheet '''
+    ''' Imports excel file and load the data stored in each sheet, based on the integer provided.
+        Unnamed colums will be removed from each dataframe.
+        The output will be 2 dataframes: Diccionario de Datos and Migration '''
     
     #Read data from sheet: 'Diccionario de Datos and skip first n rows of the excel file
     df = pd.read_excel(file, sheet_name='Diccionario de Datos' , header=0, skiprows=ind_kyd)
     df2 = pd.read_excel(file, sheet_name='Migration' , header=0, skiprows=ind_mig)
     
-    #Erase 1st row of the dataframe that contain spanish column name
+    #Erase row of the dataframe that contain english column names from 'Diccionario de Datos'
     df.drop(index=df.index[0], axis=0, inplace=True)
     df = df.reset_index()
     del df['index'] 
@@ -61,15 +84,81 @@ def load_excel(file, ind_kyd, ind_mig):
     df2 = df2[column_name]
     
     return df, df2
+
+def status_check_of_KYD(df, ind_kyd):
+    ''' Function that performe different cross checks on KYD file:
+                - Columns existence
+                - Duplicated data
+                - json structure existence
+                - tables without name
+        In case any of the checks fails the output will be False and the progran will ends, otherwise the output will be True '''
     
-def check_columns_existence(df, columns, name):
-    ''' Verify the existance of specific columns on excel file '''
+    #columns to be check
+    columnas = ['FUENTE ORIGEN',
+                'TABLA / DATASET / TÓPICO A MIGRAR',
+                'NOMBRE DE LA TABLA EN ORIGEN',
+                'DESCRIPCIÓN DE LA TABLA',
+                'NOMBRE LÓGICO TABLA',
+                'NOMBRE DEL CAMPO EN EL ORIGEN',
+                'NOMBRE LÓGICO DEL CAMPO',
+                'DESCRIPCIÓN CAMPO',
+                'TIPO DE DATO',
+                '¿PUEDE SER NULO?',
+                'LLAVE PK',
+                'LLAVE FK',
+                'NOMBRE DE LA TABLA FK',
+                'NOMBRE DEL CAMPO FK',
+                'VALORES ESPERADOS/ACEPTADOS',
+                'CLASIFICACIÓN DE DATOS',
+                'NOMBRE FÍSICO TABLA/DATASET/TOPICO',
+                'NOMBRE FÍSICO CAMPO']
+    
+    #check existence of key columns
+    check_key_columns, df = check_columns_existence(df, columnas, 'KYD')
+        
+    #show duplicated values in case of existence
+    check_duplicated = show_duplicated_data(df, ind_kyd)
+            
+    #show existence of json data
+    check_json = show_existence_of_json_data(df, ind_kyd)
+            
+    #show existence of foreign tables nameless
+    check_FK_table = show_fk_tables_without_name(df, ind_kyd)
+    
+    if (check_key_columns & check_duplicated & check_json & check_FK_table):
+        return True, df
+    else:
+        return False, df
+    
+def status_check_of_Migration(df):
+    ''' Function that cross checks the existence of the columns in Migration file. 
+        In case any of the columns is not found the output will be False and the progran will ends,
+        otherwise the output will be True '''
+    
+    columns = ['NOMBRE DE LA TABLA',
+               'TIPO DE CARGA',
+               'PERIODICIDAD DE CARGA',
+               'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
+               'COLUMNA DE FILTRADO']
+                          
+    #check existence of key columns
+    check_key_columns, df = check_columns_existence(df, columns, 'Migration')
+    
+    if (check_key_columns):
+        return True, df
+    else:
+        return False, df
+    
+def check_columns_existence(df, columns, sheet_name):
+    ''' Verifies the existence of specific columns on excel file based on the input list. 
+        In case any of the columns is not found the output will be False and will show which colum is missing,
+        otherwise the output will be True '''
     
     # remove empty spaces in column names
     for col in df.columns:
         df = df.rename(columns={col:remove_empty_spaces(col)})
     
-    #Check existance of column name listed above and rename it
+    #Check existence of column name listed above and rename it
     match = []
     for col1 in columns:
         for col2 in df.columns:
@@ -80,16 +169,21 @@ def check_columns_existence(df, columns, name):
     missing_columns = [col for col in columns if col not in match]
   
     if len(match) == len(columns):
-        st.write(r'$\checkmark$:  Validación nombre de columnas en {} !!!'.format(name))
-        return df, True
+        st.write(r'$\checkmark$:  Validación nombre de columnas en {} !!!'.format(sheet_name))
+        return True, df
     else:          
-        st.write(r'$\otimes$:  Existen columnas con nombres distintos en archivo {} !!!'.format(name))
-        st.write('Revisar columnas en archivo {} para seguir con el proceso'.format(name))
+        st.write(r'$\otimes$:  Existen columnas con nombres distintos en archivo {} !!!'.format(sheet_name))
+        st.write('Revisar columnas en archivo {} para seguir con el proceso'.format(sheet_name))
         st.write(" '{}' columna no encontrada".format(missing_columns[0]))
-        return df, False
+        return False, df
     
 def show_duplicated_data(df, n_rows):
-    """ Verify the existence of duplicated values """
+    ''' Verifies the existence of duplicated values in dataframe.
+        In case of duplicated tables are found the output will be False and a table will be displayed with: 
+              - name of duplicates 
+              - row position of 1st and 2nd duplicated value 
+        otherwise the output will be True '''
+    
     columns_to_check = ['NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO']
     
     df_check = df[columns_to_check].groupby(columns_to_check)[['NOMBRE LÓGICO DEL CAMPO']].count()
@@ -117,7 +211,8 @@ def show_duplicated_data(df, n_rows):
         return True
     
 def check_json_objects(text):
-    ''' check existance of '''
+    ''' Identifies existence of json object '''
+  
     text = str(text)
     pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
     text = pattern.findall(text)
@@ -126,8 +221,13 @@ def check_json_objects(text):
     else:
         return True
     
-def show_existance_of_json_data(df, n_rows):
-    """ Verify the existence of json values """
+def show_existence_of_json_data(df, n_rows):
+    ''' Verify the existence of json values. 
+        In case of existence of json values the output will be False and a table will be displayed with: 
+                - row position of json values 
+                - Table/field names 
+                - Type of data 
+        otherwise the output will be True '''
     
     dfjson = df.copy()
     
@@ -152,15 +252,17 @@ def show_existance_of_json_data(df, n_rows):
     df_json = df_json[['posición','NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO','TIPO DE DATO','VALORES ESPERADOS/ACEPTADOS']]
      
     if len(df_json) != 0:
-            st.write(r'$\otimes$:  Se detectaron datos de tipo JSON en KYD!! \n\n Esto se debe reportar al respectivo dominio !!!')
-            st.dataframe(df_json.astype(str))
-            return False
+        st.write(r'$\otimes$:  Se detectaron datos de tipo JSON en KYD!! \n\n Esto se debe reportar al respectivo dominio !!!')
+        st.dataframe(df_json.astype(str))
+        return False
     else:
         st.write(r'$\checkmark$:  No existen datos de tipo JSON en KYD !!!')
         return True
 
 def show_fk_tables_without_name(df, n_rows):
-    ''' Check if a foreign key field has asigned a table name '''
+    ''' Check if a foreign key field has asigned a table name. 
+        In case a foreign key has not assigned a table the output will be False and a table will be displayed with the names of the missing fields, otherwise the output will be True '''
+    
     cut_fk = (df['LLAVE FK'] == 'SI')
     cut_name_fk = ((df['NOMBRE DE LA TABLA FK'] == 'SIN DATOS')|(df['NOMBRE DE LA TABLA FK'].isna()))
     
@@ -181,53 +283,12 @@ def show_fk_tables_without_name(df, n_rows):
         st.dataframe(nameless_tables.astype(str))
         return False
     
-def fill_field_fk_parameters(df):
-    ''' Fill the name of the field FK based on the existen PK fields  '''
-    campos_PK = df[(df['LLAVE PK'] == 'SI')][['NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO']]
-    campos_FK_dict = dict( zip(campos_PK['NOMBRE LÓGICO TABLA'], campos_PK['NOMBRE LÓGICO DEL CAMPO']) ) 
-    
-    for i, row in enumerate(df['NOMBRE DE LA TABLA FK']):
-        table_name = None
-        if (row == 'SIN DATOS'):
-            df.at[i, 'NOMBRE DEL CAMPO FK'] = 'SIN DATOS'
-        else:
-            if (df.at[i, 'NOMBRE DEL CAMPO FK'] == 'SIN DATOS'):
-                if row in campos_PK['NOMBRE LÓGICO TABLA'].tolist():
-                    table_name = campos_FK_dict[row]
-                    df.at[i, 'NOMBRE DEL CAMPO FK'] = table_name 
-                else:
-                    df.at[i, 'NOMBRE DEL CAMPO FK'] = df.at[i, 'NOMBRE LÓGICO DEL CAMPO']
-                    
-    return df     
-    
-def rename_columns(df):
-    ''' Rename df columns '''
-    df.rename(columns = {'NOMBRE LÓGICO TABLA':'table', 
-                         'NOMBRE LÓGICO DEL CAMPO':'field',
-                         'TIPO DE DATO':'type', 
-                         'LLAVE PK':'key_pk',
-                         'LLAVE FK':'key_fk',
-                         'NOMBRE DE LA TABLA FK':'table_fk',
-                         'NOMBRE DEL CAMPO FK':'field_fk',
-                         '¿PUEDE SER NULO?':'is_null',
-                         'CLASIFICACIÓN DE DATOS':'type_data'}, inplace=True)
-    return df
-
-def inverse_rename_columns(df):
-    ''' Rename df columns '''
-    df.rename(columns = {'table':'NOMBRE LÓGICO TABLA', 
-                         'field':'NOMBRE LÓGICO DEL CAMPO',
-                         'type':'TIPO DE DATO', 
-                         'key_pk':'LLAVE PK',
-                         'key_fk':'LLAVE FK',
-                         'table_fk':'NOMBRE DE LA TABLA FK',
-                         'field_fk':'NOMBRE DEL CAMPO FK', 
-                         'is_null':'¿PUEDE SER NULO?',
-                         'type_data':'CLASIFICACIÓN DE DATOS'}, inplace=True)
-    return df
-
 def show_missing_data(df, n_rows, name):
-    """ Return a Pandas dataframe describing the contents of a source dataframe including missing values. It will return a dataframe with all the columns with missing values """
+    ''' Verifies the existence of missing valies in the dataframe.
+        In case of missing valies are found it will return a table with:
+            - all the columns with missing values
+            - nº and % of missing values per column 
+            - position of the 1st missing value '''
        
     columns = [col for col in df.columns]
     count   = [len(df[col]) for col in df.columns]
@@ -267,8 +328,54 @@ def show_missing_data(df, n_rows, name):
             return list_col_with_missing_data
     else:
         st.write(r'$\checkmark$:  No existen columnas con datos faltantes en {} !!!'.format(name))
-        #st.dataframe(df_output[df_output['%_nan'] > 0.0].astype(str)) 
         return []
+
+def fill_field_fk_parameters(df):
+    ''' Fill the name of the field FK based on the existen PK fields  '''
+    
+    campos_PK = df[(df['LLAVE PK'] == 'SI')][['NOMBRE LÓGICO TABLA','NOMBRE LÓGICO DEL CAMPO']]
+    campos_FK_dict = dict( zip(campos_PK['NOMBRE LÓGICO TABLA'], campos_PK['NOMBRE LÓGICO DEL CAMPO']) ) 
+    
+    for i, row in enumerate(df['NOMBRE DE LA TABLA FK']):
+        table_name = None
+        if (row == 'SIN DATOS'):
+            df.at[i, 'NOMBRE DEL CAMPO FK'] = 'SIN DATOS'
+        else:
+            if (df.at[i, 'NOMBRE DEL CAMPO FK'] == 'SIN DATOS'):
+                if row in campos_PK['NOMBRE LÓGICO TABLA'].tolist():
+                    table_name = campos_FK_dict[row]
+                    df.at[i, 'NOMBRE DEL CAMPO FK'] = table_name 
+                else:
+                    df.at[i, 'NOMBRE DEL CAMPO FK'] = df.at[i, 'NOMBRE LÓGICO DEL CAMPO']                
+    return df     
+    
+def rename_columns(df):
+    ''' Rename dataframe columns for simplicity '''
+    
+    df.rename(columns = {'NOMBRE LÓGICO TABLA':'table', 
+                         'NOMBRE LÓGICO DEL CAMPO':'field',
+                         'TIPO DE DATO':'type', 
+                         'LLAVE PK':'key_pk',
+                         'LLAVE FK':'key_fk',
+                         'NOMBRE DE LA TABLA FK':'table_fk',
+                         'NOMBRE DEL CAMPO FK':'field_fk',
+                         '¿PUEDE SER NULO?':'is_null',
+                         'CLASIFICACIÓN DE DATOS':'type_data'}, inplace=True)
+    return df
+
+def inverse_rename_columns(df):
+    ''' Comeback to the original column names '''
+    
+    df.rename(columns = {'table':'NOMBRE LÓGICO TABLA', 
+                         'field':'NOMBRE LÓGICO DEL CAMPO',
+                         'type':'TIPO DE DATO', 
+                         'key_pk':'LLAVE PK',
+                         'key_fk':'LLAVE FK',
+                         'table_fk':'NOMBRE DE LA TABLA FK',
+                         'field_fk':'NOMBRE DEL CAMPO FK', 
+                         'is_null':'¿PUEDE SER NULO?',
+                         'type_data':'CLASIFICACIÓN DE DATOS'}, inplace=True)
+    return df
 
 def remove_empty_spaces(text):
     ''' Remove first, last and several spaces in between from string '''
@@ -287,7 +394,11 @@ def replace_space_by_(text):
         return text
 
 def transform_text(df):
-    ''' Transform all columns to upper case, removing first and last empty space, change - by _, change space in between with _ on specific columns '''
+    ''' Transform all values on the list of columns listed above applying:
+         - lower to upper case
+         - removing first and last empty space
+         - change - by _
+         - change space in between with _ '''
     
     list_of_cols_to_consider = ['TABLA / DATASET / TÓPICO A MIGRAR',
                                 'NOMBRE DE LA TABLA EN ORIGEN',
@@ -297,6 +408,7 @@ def transform_text(df):
                                 'NOMBRE DE LA TABLA FK',
                                 'NOMBRE DEL CAMPO FK']
     
+    #Apply transformation
     for col in df.columns:
         df[[col]] = df[[col]].apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
@@ -307,14 +419,18 @@ def transform_text(df):
     return df
 
 def transform_text_migration(df):
-    ''' Transform all columns to upper case, removing first and last empty space and change space in between with _ on specific columns '''
+    ''' Transform all values on the list of columns listed above applying:
+         - lower to upper case
+         - removing first and last empty space
+         - change space in between with _ '''
+    
     list_of_cols_to_consider = ['NOMBRE DE LA TABLA',
                                 'TIPO DE CARGA',
                                 'PERIODICIDAD DE CARGA',
                                 'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
                                 'COLUMNA DE FILTRADO']
         
-    #Change to upper case, remove empty spaces and change ' ' to _
+    #Apply transformation
     for col in df.columns:
         df[[col]] = df[[col]].astype(str).apply(lambda x: x.str.upper())
         df[col] = df[col].apply(remove_empty_spaces)
@@ -323,7 +439,8 @@ def transform_text_migration(df):
     return df
 
 def fill_load_ts(df, df2):
-    ''' Check from Migration spreadsheet the number of tables to add the field __TS'''
+    ''' Check from Migration sheet the number of tables to add the field LOAD_TS.
+        It provides to the user the option of choose wheter will like to add the LOAD_TS field or not '''
 
     df_tablas = df.groupby('NOMBRE LÓGICO TABLA').first()
     df_tablas = df_tablas.reset_index()
@@ -358,7 +475,7 @@ def fill_load_ts(df, df2):
                         'NOMBRE FÍSICO CAMPO':['SIN DATOS']})
             df_load_ts = pd.concat([df_load_ts, df2])
         if len(df_load_ts) > 0:
-            st.write(r'Se detectaron {} campos LOAD_TS. ¿Desea agregarlos al archivo .ddl?'.format(len(df_load_ts)))
+            st.write(r'Se detectaron {} campos LOAD_TS. ¿Desea agregarlos al archivo .ddl? (SI/NO) (escribir en terminal)'.format(len(df_load_ts)))
             answer = question()
             
             if answer.upper() == 'SI':
@@ -377,16 +494,14 @@ def fill_load_ts(df, df2):
         st.write("No se generaron campos LOAD_TS")
         return df
 
-    
 def replace_missing_values(df, list_columns):
-    ''' Considere the list of columns to check and provide to the user the oportunity to fill the nan values found '''
+    ''' Consider the list of columns to check and give the user an opportunity to fill in the nan values found.
+        It will recursively ask the usert what value he want to add in each column that has found missing values. '''
+    
     for i,col in enumerate(list_columns):
         st.write("{}- La columna '{}' contiene '{}' celdas vacías:".format(i+1, col,  df[col].isna().sum() ))
-        #df[[col]] = df[[col]].apply(lambda x: x.str.upper())
-        #st.dataframe(df[df[[col]].isna()==True][[col]].astype(str))
         st.write("¿Que valor deseas reemplazar en celda vacía? (escribir en terminal)")
         new_word = str(input('Introduzca texto: '))
-        #new_word = st.text_input('Texto: ', '')
         st.markdown(f"Se cambiara 'nan' por '{new_word}'")
         df[[col]] = df[[col]].replace(np.nan, new_word)
         df[[col]] = df[[col]].apply(lambda x: x.str.upper())
@@ -441,7 +556,7 @@ def standarize_data_on_columns(df):
     return df
 
 def split_on_sensitibity(df):
-    '''Split dataframe depending of the type of sensitibity of the respective table'''
+    ''' Split dataframe depending of the type of sensitibity of the respective table '''
     
     #change colum names for simplicity
     df = rename_columns(df)
@@ -506,7 +621,7 @@ def sensitive_data_name(data):
     else: return data.upper()
 
 def create_modified_excel_file(df, sub_domain, type_data):
-    ''' Generate a new excel file considering all the columns with missing values filled ''' 
+    ''' Generate a new excel file considering all transformations done during the process ''' 
     
     df = inverse_rename_columns(df)
     type_data_name = sensitive_data_name(type_data)
@@ -522,80 +637,9 @@ def create_modified_excel_file(df, sub_domain, type_data):
         df.to_excel(writer, sheet_name='KYD', startrow=5, startcol=2, index=False)
     
     return
-
-def status_check_of_KYD(df, ind_kyd):
-    ''' Function that collect different cross checks on KYD file '''
-    
-    #columns to be check
-    columnas = ['FUENTE ORIGEN',
-                'TABLA / DATASET / TÓPICO A MIGRAR',
-                'NOMBRE DE LA TABLA EN ORIGEN',
-                'DESCRIPCIÓN DE LA TABLA',
-                'NOMBRE LÓGICO TABLA',
-                'NOMBRE DEL CAMPO EN EL ORIGEN',
-                'NOMBRE LÓGICO DEL CAMPO',
-                'DESCRIPCIÓN CAMPO',
-                'TIPO DE DATO',
-                '¿PUEDE SER NULO?',
-                'LLAVE PK',
-                'LLAVE FK',
-                'NOMBRE DE LA TABLA FK',
-                'NOMBRE DEL CAMPO FK',
-                'VALORES ESPERADOS/ACEPTADOS',
-                'CLASIFICACIÓN DE DATOS',
-                'NOMBRE FÍSICO TABLA/DATASET/TOPICO',
-                'NOMBRE FÍSICO CAMPO']
-    
-    #check existence of key columns
-    df, check_key_columns = check_columns_existence(df, columnas, 'KYD')
-        
-    #show duplicated values in case of existance
-    check_duplicated = show_duplicated_data(df, ind_kyd)
-            
-    #show existance of json data
-    check_json = show_existance_of_json_data(df, ind_kyd)
-            
-    #show existance of foreign tables nameless
-    check_FK_table = show_fk_tables_without_name(df, ind_kyd)
-    
-    if (check_key_columns & check_duplicated & check_json & check_FK_table):
-        return df, True
-    else:
-        return df, False
-    
-def status_check_of_Migration(df):
-    ''' Function that collect different cross checks on Migration file '''
-    
-    columns = ['NOMBRE DE LA TABLA',
-               'TIPO DE CARGA',
-               'PERIODICIDAD DE CARGA',
-               'CANTIDAD DE DIAS A EXTRAER EN LA CARGA',
-               'COLUMNA DE FILTRADO']
-                          
-    #check existence of key columns
-    df, check_key_columns = check_columns_existence(df, columns, 'Migration')
-    
-    if (check_key_columns):
-        return df, True
-    else:
-        return df, False
-    
-def find_tables(file):
-    ''' Find the tables on respectives spreadsheets based on the columns names listed below '''
-    
-    cols_kyd = ['FUENTE ORIGEN','TABLA / DATASET / TÓPICO A MIGRAR','NOMBRE DE LA TABLA EN ORIGEN']        
-    cols_mig = ['NOMBRE DE LA TABLA','TIPO DE CARGA','PERIODICIDAD DE CARGA']
-    
-    check_kyd, ind_kyd = find_skiprows_on_excel(file, 'Diccionario de Datos', cols_kyd)
-    check_mig, ind_mig = find_skiprows_on_excel(file, 'Migration', cols_mig)
-    
-    if (check_kyd & check_mig):
-        return True, ind_kyd, ind_mig
-    else:
-        return False, ind_kyd, ind_mig
         
 def check_subdominio(df):
-    ''' Check for subdominio existance '''
+    ''' Verifies the existence of sub-domains. If 'SUB-DOMINIO' appears on Migration sheet will recognize the nº of different subdomains and will print a table summarizing this information '''
     
     if 'SUB-DOMINIO' in df:
         sub_dom = [sub_dom for sub_dom in df['SUB-DOMINIO'].unique()]
@@ -633,6 +677,7 @@ def clean_list(lista):
     return lista
 
 def distribution_of_tables(df, type_data):
+    ''' Identified and create a list of usefull information for the creation of the ddl file '''
     
     df = df.reset_index()
     del df['index']
@@ -835,32 +880,33 @@ def write_output(df, subdomain, sensitibity):
 if __name__ == '__main__':
     
     st.title('Generador de DDL')
-    st.write('Convierte tu Excel Know Your Data en un script de tipo ddl que usarás luego para crear el modelo Erwin.')
-    st.write('El formato de tu Know Your Data debe respetar la estructura según el template original para que este convertidor funcione.')
+    st.write('Convierte tu archivo Know Your Data (KYD) tipo excel en un script de tipo ddl que usarás luego para crear el modelo Erwin.')
+    st.write('El formato de tu KYD debe respetar la estructura según el template original para que este convertidor funcione.')
     st.write("El archivo KYD debe contener las hojas 'Diccionario de Datos' y 'Migration' para su correcto funcionamiento.")
     
     #File uploader
     file = st.file_uploader("Por favor elige un archivo Excel")
     
     if file is not None:
-        #Check existance of spreadsheets in excel file
-        check_sheets = check_sheets_existance(file)
+        #Check existence of spreadsheets in excel file
+        check_sheets = check_sheets_existence(file)
         
         if check_sheets:
-            #find excel tables
+            #Finds excel tables
             check_table, ind_kyd, ind_mig = find_tables(file)
         
             if check_table:
-                #load excel file
+                #Load excel file
                 df, df_mig = load_excel(file, ind_kyd, ind_mig)
             
-                # Several cross checks to make sure file KYD is OK
-                df, status_ckeck_KYD = status_check_of_KYD(df, ind_kyd)
+                #Several cross checks will be done to make sure file KYD is OK
+                status_ckeck_KYD, df = status_check_of_KYD(df, ind_kyd)
             
-                # Several cross checks to make sure file KYD is OK
-                df_mig, status_ckeck_Migration = status_check_of_Migration(df_mig)
+                #Several cross checks to make sure file KYD is OK
+                status_ckeck_Migration, df_mig = status_check_of_Migration(df_mig)
 
                 if (status_ckeck_KYD & status_ckeck_Migration):          
+                    
                     #checking missing values
                     list_cols_with_md = show_missing_data(df, ind_kyd, 'KYD')
                     list_cols_with_mig = show_missing_data(df_mig, ind_mig, 'Migration')
