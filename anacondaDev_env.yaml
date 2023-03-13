@@ -179,4 +179,4 @@ dependencies:
   - pip:
       - et-xmlfile==1.1.0
       - openpyxl==3.0.10
-prefix: C:\Users\Vn55b86\.conda\envs\dev
+prefix: C:\Users\user_name\.conda\envs\dev
