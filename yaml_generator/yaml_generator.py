@@ -673,8 +673,10 @@ if __name__ == '__main__':
 
     st.set_page_config(page_title='Generador de YAML')
     st.title('Generador de YAML  📈')
-    st.subheader('Crea tu archivo yaml, para eso debes subir el excel extraído desde Erwin que contenga una copia con el excel Know your data.')
-    st.write('Al archivo excel extraído desde Erwin: Crea una nueva hoja llamada "KYD", luego pega toda la información del KYD en esta hoja y súbelo aquí:')
+    st.subheader('Convierte tu archivo Models tipo excel en un script de tipo yaml que usarás luego para realizar el Pull Request')
+    st.write('Antes de subir el archivo Models a esta automatización recuerda copiar las siguientes pestañas:')
+    st.write('     - Hoja "KYD" del archivo excel generado por la automatización ddl')
+    st.write('     - Hoja Migration" del archivo KYD original')
 
     #File uploader
     file = st.file_uploader("Por favor sube el archivo Excel extraído desde Erwin")
